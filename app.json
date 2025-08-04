@@ -39,7 +39,15 @@
     "owner": "alinaberens",
     "plugins": [
       "expo-dev-client",
-      "expo-build-properties"
+      "@react-native-firebase/app",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
     ]
   }
 }
