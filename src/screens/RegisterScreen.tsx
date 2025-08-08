@@ -1,11 +1,16 @@
+// src/screens/RegisterScreen.tsx
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
 import React, { useState } from 'react';
 import { Alert, Button, StyleSheet, Text, TextInput, View } from 'react-native';
-import { RootStackParamList } from '../navigation/types';
-import { auth, db } from 'services/firebase/init';
+import type { RootStackParamList } from '../navigation/types';
 
+// Нативный модульный Auth
+import { createUserWithEmailAndPassword } from '@react-native-firebase/auth';
+// Нативный модульный Firestore
+import { doc, setDoc } from '@react-native-firebase/firestore';
+
+// Инстансы из вашего init.ts
+import { auth, db } from '../services/firebase/init';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Register'>;
@@ -24,21 +29,25 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      // 1) Регистрируем в Auth
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
       const uid = userCredential.user.uid;
 
-      console.log(typeof doc, doc.length); // должен быть 3
-
+      // 2) Создаём документ в Firestore
       await setDoc(doc(db, 'users', uid), {
         id: uid,
         name,
-        email,
+        email: email.trim(),
         city,
         level: 1,
         favoriteSport: 'tennis',
       });
 
-
+      // 3) Переходим на главный экран
       navigation.reset({
         index: 0,
         routes: [{ name: 'Home' }],
@@ -51,9 +60,26 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Register</Text>
-      <TextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />
-      <TextInput style={styles.input} placeholder="City" value={city} onChangeText={setCity} />
-      <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} />
+      <TextInput
+        style={styles.input}
+        placeholder="Name"
+        value={name}
+        onChangeText={setName}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="City"
+        value={city}
+        onChangeText={setCity}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        autoCapitalize="none"
+        keyboardType="email-address"
+      />
       <TextInput
         style={styles.input}
         placeholder="Password"
@@ -63,7 +89,10 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       />
       <Button title="Create Account" onPress={handleRegister} />
       <View style={{ marginTop: 10 }}>
-        <Button title="Already have an account? Login" onPress={() => navigation.navigate('Login')} />
+        <Button
+          title="Already have an account? Login"
+          onPress={() => navigation.navigate('Login')}
+        />
       </View>
     </View>
   );

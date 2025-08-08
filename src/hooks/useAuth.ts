@@ -1,8 +1,9 @@
 // src/hooks/useAuth.ts
+import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { useEffect, useState } from 'react';
+import { onAuthStateChanged } from '@react-native-firebase/auth';
 import { auth } from '../services/firebase/init';
 import { useAuthStore } from '../store/authStore';
-import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
 
 export const useAuth = () => {
   const user = useAuthStore(s => s.firebaseUser);
@@ -11,7 +12,9 @@ export const useAuth = () => {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = auth().onAuthStateChanged(
+    // Подписываемся на изменения статуса аутентификации
+    const unsubscribe = onAuthStateChanged(
+      auth,
       (u: FirebaseAuthTypes.User | null) => {
         setUser(u);
         if (initializing) setInitializing(false);
