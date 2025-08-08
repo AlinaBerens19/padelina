@@ -18,7 +18,9 @@
       "bundleIdentifier": "com.alinaberens.padelina",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+     
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
@@ -26,7 +28,9 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.alinaberens.padelina"
+      "package": "com.alinaberens.padelina",
+      
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -39,7 +43,11 @@
     "owner": "alinaberens",
     "plugins": [
       "expo-dev-client",
+     
       "@react-native-firebase/app",
+     
+      "@react-native-firebase/auth",
+      
       [
         "expo-build-properties",
         {

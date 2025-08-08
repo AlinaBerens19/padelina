@@ -1,18 +1,18 @@
-import firebase from '@react-native-firebase/app';
-import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+// App.tsx
+import { getApp } from '@react-native-firebase/app';
+import React from 'react';
+import { StyleSheet, Text } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import SpinnerOverlay from './src/components/SpinnerOverlay';
 import { useAuth } from './src/hooks/useAuth';
 import AppNavigator from './src/navigation/AppNavigator';
 
 export default function App() {
-  // Проверяем, что нативный Firebase App подхватывается автоматически
-  useEffect(() => {
-    console.log('✅ Firebase default app:', firebase.app().name);
-  }, []);
-
   const { initializing, isAuthenticated } = useAuth();
+
+  // Модульный вызов вместо deprecated namespaced API:
+  const app = getApp();
+  console.log('✅ Firebase default app:', app.name);
 
   if (initializing) {
     return (
@@ -26,21 +26,17 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1 }}>
-        <SafeAreaView style={styles.safe}>
-          {isAuthenticated ? (
-            <AppNavigator />
-          ) : (
-            <Text style={styles.center}>Please log in to continue</Text>
-          )}
-        </SafeAreaView>
-        <SpinnerOverlay />
-      </View>
+      <AppNavigator isAuthenticated={isAuthenticated} />
+      <SpinnerOverlay />
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
-  safe: { flex: 1, backgroundColor: '#fff' },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
 });
