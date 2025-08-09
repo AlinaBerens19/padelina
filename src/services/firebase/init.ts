@@ -1,14 +1,9 @@
-// src/services/firebase/init.ts
-import { getApp } from '@react-native-firebase/app';
-import { getAuth } from '@react-native-firebase/auth';
-import { getFirestore } from '@react-native-firebase/firestore';
-import { getStorage } from '@react-native-firebase/storage';
+import authRN from '@react-native-firebase/auth';
+import firestoreRN from '@react-native-firebase/firestore';
+import storageRN from '@react-native-firebase/storage';
 
-// Берём дефолтный App (создаётся автоматически по google-services.json / GoogleService-Info.plist)
-const app = getApp();
+export const auth = authRN();        // инстанс
+export const db = firestoreRN();     // инстанс
+export const storage = storageRN();  // инстанс
 
-// Экспортируем готовые экземпляры модулей
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
-export default app; // Экспортируем сам App, если нужно
+export const firebaseApp = auth.app; // если где-то нужен сам App

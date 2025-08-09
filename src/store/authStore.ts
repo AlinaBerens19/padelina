@@ -1,8 +1,8 @@
 // src/store/authStore.ts
-
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
+import { createJSONStorage, devtools, persist } from 'zustand/middleware';
 
 interface AuthState {
   firebaseUser: FirebaseAuthTypes.User | null;
@@ -24,9 +24,16 @@ export const useAuthStore = create<AuthState>()(
       }),
       {
         name: 'auth-storage',
-        partialize: (state) => ({
-          firebaseUser: state.firebaseUser,
-          isAuthenticated: state.isAuthenticated,
+        storage: createJSONStorage(() => AsyncStorage),
+        partialize: (s) => ({
+          isAuthenticated: s.isAuthenticated,
+          firebaseUser: s.firebaseUser
+            ? {
+                uid: s.firebaseUser.uid,
+                email: s.firebaseUser.email,
+                displayName: s.firebaseUser.displayName,
+              }
+            : null,
         }),
       }
     )
