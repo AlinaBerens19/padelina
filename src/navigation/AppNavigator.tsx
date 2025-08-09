@@ -8,7 +8,6 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 
 // экраны Main
-import CreateMatchScreen from '../screens/CreateMatchScreen';
 import SettingsScreen from '../screens/Settings/SettingsScreen';
 import BottomTabs from './BottomTabs';
 
@@ -30,7 +29,6 @@ export default function AppNavigator({ isAuthenticated }: Props) {
           <Stack.Screen name="Home" component={BottomTabs} />
 
           {/* Дополнительные экраны */}
-          <Stack.Screen name="CreateMatch" component={CreateMatchScreen} />
           <Stack.Screen name="Settings"    component={SettingsScreen} />
         </Stack.Navigator>
       ) : (

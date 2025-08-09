@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 
 type Props = {
@@ -60,45 +61,47 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Padelina</Text>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Padelina</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-        editable={!loading}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        editable={!loading}
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
+          editable={!loading}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+          editable={!loading}
+        />
 
-      <TouchableOpacity
-        onPress={handleLogin}
-        disabled={loading}
-        activeOpacity={0.8}
-        style={[styles.btn, loading && styles.btnDisabled]}
-      >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Login</Text>}
-      </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleLogin}
+          disabled={loading}
+          activeOpacity={0.8}
+          style={[styles.btn, loading && styles.btnDisabled]}
+        >
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Login</Text>}
+        </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.linkBtn}>
-        <Text style={styles.linkText}>Create account</Text>
-      </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.linkBtn}>
+          <Text style={styles.linkText}>Create account</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity onPress={handleForgot} style={styles.linkBtn}>
-        <Text style={styles.linkText}>Forgot password?</Text>
-      </TouchableOpacity>
-    </View>
+        <TouchableOpacity onPress={handleForgot} style={styles.linkBtn}>
+          <Text style={styles.linkText}>Forgot password?</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 };
 
@@ -121,23 +124,14 @@ const mapAuthError = (code?: string, fallback = 'Something went wrong') => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20 },
+  safe: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#fff' },
   title: { fontSize: 32, fontWeight: 'bold', textAlign: 'center', marginBottom: 40 },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    fontSize: 16,
-    backgroundColor: '#fff',
+    borderWidth: 1, borderColor: '#ccc', borderRadius: 8,
+    padding: 12, marginBottom: 16, fontSize: 16, backgroundColor: '#fff',
   },
-  btn: {
-    backgroundColor: '#111827',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
+  btn: { backgroundColor: '#111827', paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   linkBtn: { marginTop: 12, alignItems: 'center' },
