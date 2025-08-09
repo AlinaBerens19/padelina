@@ -1,19 +1,84 @@
-import firestore from '@react-native-firebase/firestore';
-import React, { useState } from 'react';
-import { Alert, ScrollView, Text, TextInput, TouchableOpacity } from 'react-native';
+import {
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+} from '@react-native-firebase/firestore';
+import { Picker } from '@react-native-picker/picker';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
+import { db } from '../../services/firebase/db'; // экспорт getFirestore(app)
 import { useSpinnerStore } from '../../store/spinnerStore';
 import { styles } from './SettingsScreen.styles';
 
+const SPORTS = ['Tennis', 'Padel', 'Pickleball'] as const;
+const LEVELS = ['1', '1.5', '2', '2.5', '3', '3.5', '4', '4.5', '5'] as const;
+
 const SettingsScreen = () => {
   const { user } = useAuth();
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
   const [name, setName] = useState(user?.displayName || '');
   const [location, setLocation] = useState('');
-  const [level, setLevel] = useState('');
-  const [favouriteSport, setFavouriteSport] = useState('');
-  const [phone, setPhone] = useState('');
+  const [level, setLevel] = useState<string>(''); // строка из LEVELS
+  const [favouriteSport, setFavouriteSport] = useState<string>('');
+  const [phone, setPhone] = useState(''); // только цифры
   const [address, setAddress] = useState('');
+
+  // Подтягиваем дефолты из Firestore: users/{uid}
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const load = async () => {
+      try {
+        setLoadingProfile(true);
+        const userRef = doc(db, 'users', user.uid);
+        const snap = await getDoc(userRef);
+        const data = (snap.exists() ? snap.data() : {}) as Record<string, any>;
+
+        setName(
+          typeof data.name === 'string' && data.name.trim()
+            ? data.name
+            : user.displayName || '',
+        );
+        setLocation(typeof data.location === 'string' ? data.location : '');
+
+        const lvlStr =
+          typeof data.level === 'number'
+            ? String(data.level)
+            : typeof data.level === 'string'
+            ? data.level
+            : '';
+        setLevel(LEVELS.includes(lvlStr as any) ? lvlStr : '');
+
+        const sportStr =
+          typeof data.favouriteSport === 'string' ? data.favouriteSport : '';
+        setFavouriteSport(SPORTS.includes(sportStr as any) ? sportStr : '');
+
+        setPhone(
+          typeof data.phone === 'string'
+            ? data.phone.replace(/\D/g, '').slice(0, 10)
+            : '',
+        );
+        setAddress(typeof data.address === 'string' ? data.address : '');
+      } catch (e: any) {
+        Alert.alert('Ошибка', e?.message || 'Не удалось загрузить профиль.');
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    load();
+  }, [user?.uid, user?.displayName]);
 
   const handleSave = async () => {
     const spinner = useSpinnerStore.getState();
@@ -21,22 +86,43 @@ const SettingsScreen = () => {
       spinner.show('Saving...');
       if (!user) throw new Error('User not found');
 
-      const profile = {
+      // Телефон: ровно 10 цифр
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (phoneDigits.length !== 10) {
+        Alert.alert('Invalid phone', 'Phone number must contain exactly 10 digits.');
+        return;
+      }
+
+      // Валидация выбора из списков
+      if (!SPORTS.includes(favouriteSport as any)) {
+        Alert.alert('Validation', 'Please select your favourite sport.');
+        return;
+      }
+      if (!LEVELS.includes(level as any)) {
+        Alert.alert('Validation', 'Please select your level.');
+        return;
+      }
+
+      const levelNum = parseFloat(level); // допускаем 1.5 и т.п.
+
+      const payload: Record<string, any> = {
         uid: user.uid,
-        name,
-        location,
-        level: Number(level),
+        name: name.trim(),
+        location: location.trim(),
         favouriteSport,
-        phone,
-        address,
+        phone: phoneDigits,
+        address: address.trim(),
         email: user.email,
-        updatedAt: firestore.FieldValue.serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        level: Number.isFinite(levelNum) ? levelNum : undefined,
       };
 
-      await firestore().collection('users').doc(user.uid).set(profile);
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, payload, { merge: true });
+
       Alert.alert('Saved', 'Your changes have been saved.');
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Could not save profile.');
+      Alert.alert('Error', e?.message || 'Could not save profile.');
     } finally {
       spinner.hide();
     }
@@ -44,28 +130,92 @@ const SettingsScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.header}>Profile Settings</Text>
 
         <Text style={styles.label}>Full Name</Text>
-        <TextInput value={name} onChangeText={setName} style={styles.input} autoCapitalize="words" />
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          style={styles.input}
+          autoCapitalize="words"
+          placeholder={loadingProfile ? 'Loading...' : 'Enter full name'}
+        />
 
         <Text style={styles.label}>Location</Text>
-        <TextInput value={location} onChangeText={setLocation} style={styles.input} />
+        <TextInput
+          value={location}
+          onChangeText={setLocation}
+          style={styles.input}
+          placeholder={loadingProfile ? 'Loading...' : 'City, Country'}
+        />
 
         <Text style={styles.label}>Level</Text>
-        <TextInput value={level} onChangeText={setLevel} style={styles.input} keyboardType="numeric" />
+        <View style={styles.pickerWrapper}>
+          <Picker
+            selectedValue={level}
+            onValueChange={(v) => setLevel(String(v))}
+            style={styles.picker}
+            mode="dropdown"
+            dropdownIconColor="#111"
+          >
+            <Picker.Item
+              label={loadingProfile ? 'Loading...' : 'Select level'}
+              value=""
+            />
+            {LEVELS.map((lvl) => (
+              <Picker.Item key={lvl} label={lvl} value={lvl} />
+            ))}
+          </Picker>
+        </View>
 
         <Text style={styles.label}>Favourite Sport</Text>
-        <TextInput value={favouriteSport} onChangeText={setFavouriteSport} style={styles.input} />
+        <View style={styles.pickerWrapper}>
+          <Picker
+            selectedValue={favouriteSport}
+            onValueChange={(v) => setFavouriteSport(String(v))}
+            style={styles.picker}
+            mode="dropdown"
+            dropdownIconColor="#111"
+          >
+            <Picker.Item
+              label={loadingProfile ? 'Loading...' : 'Select sport'}
+              value=""
+            />
+            {SPORTS.map((s) => (
+              <Picker.Item key={s} label={s} value={s} />
+            ))}
+          </Picker>
+        </View>
 
         <Text style={styles.label}>Phone</Text>
-        <TextInput value={phone} onChangeText={setPhone} style={styles.input} keyboardType="phone-pad" />
+        <TextInput
+          value={phone}
+          onChangeText={(t) => setPhone(t.replace(/\D/g, '').slice(0, 10))}
+          style={styles.input}
+          keyboardType="phone-pad"
+          placeholder={loadingProfile ? 'Loading...' : 'e.g., 0501234567'}
+          maxLength={10}
+        />
 
         <Text style={styles.label}>Address</Text>
-        <TextInput value={address} onChangeText={setAddress} style={styles.input} />
+        <TextInput
+          value={address}
+          onChangeText={setAddress}
+          style={styles.input}
+          placeholder={
+            loadingProfile ? 'Loading...' : 'Street, Building, etc.'
+          }
+        />
 
-        <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
+        <TouchableOpacity
+          onPress={handleSave}
+          style={styles.saveButton}
+          disabled={loadingProfile}
+        >
           <Text style={styles.saveText}>Save</Text>
         </TouchableOpacity>
       </ScrollView>

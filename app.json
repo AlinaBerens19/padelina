@@ -43,18 +43,11 @@
     "owner": "alinaberens",
     "plugins": [
       "expo-dev-client",
-     
       "@react-native-firebase/app",
-     
-      "@react-native-firebase/auth",
-      
-      [
-        "expo-build-properties",
-        {
+      ["expo-build-properties", {
         "android": { "minSdkVersion": 24, "targetSdkVersion": 35, "compileSdkVersion": 35 },
         "ios": { "deploymentTarget": "15.1", "useFrameworks": "static" }
-        }
-      ]
+      }]
     ]
   }
 }

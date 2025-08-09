@@ -1,96 +1,161 @@
 import { Ionicons } from '@expo/vector-icons';
-import { signOut } from '@react-native-firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React from 'react';
-import { Alert, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { getAuth, signOut } from '@react-native-firebase/auth';
+import { doc, onSnapshot } from '@react-native-firebase/firestore';
+
+import UserProfile from 'components/UserProfile';
 import { useAuth } from '../../hooks/useAuth';
 import type { RootStackParamList } from '../../navigation/types';
-import { auth } from '../../services/firebase/init';
+import { db } from '../../services/firebase/db';
 import { styles } from './UserProfile.styles';
 
+type Profile = {
+  level?: number;
+  favouriteSport?: string;
+  avatarUrl?: string;
+  name?: string;
+  email?: string;
+  location?: string;
+  phone?: string;
+  address?: string;
+  updatedAt?: any; // Firestore Timestamp
+};
 
-const UserProfile = () => {
+const safeText = (v?: string | null) => (v && v.trim().length ? v.trim() : '—');
+
+const auth = getAuth();
+
+const ProfileScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user, isAuthenticated } = useAuth();
 
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    setLoading(true);
+
+    const ref = doc(db, 'users', user.uid);
+    const unsub = onSnapshot(
+      ref,
+      snap => {
+        setProfile(snap.exists() ? (snap.data() as Profile) : null);
+        setLoading(false);
+      },
+      err => {
+        console.error('Firestore profile error:', err);
+        Alert.alert('Ошибка', 'Не удалось загрузить профиль пользователя.');
+        setLoading(false);
+      }
+    );
+
+    return unsub;
+  }, [user?.uid]);
+
   if (!isAuthenticated || !user) {
     return (
-      <View style={styles.container}>
-        <Text style={{ textAlign: 'center', marginTop: 40 }}>Please log in to view your profile.</Text>
-      </View>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          <Text style={{ textAlign: 'center', marginTop: 40 }}>
+            Please log in to view your profile.
+          </Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Шапка: Firestore -> Firebase Auth -> заглушка
+  const name = safeText(profile?.name ?? user.displayName);
+  const email = safeText(profile?.email ?? user.email);
+  const photo = profile?.avatarUrl || user.photoURL;
+
+  const callPhone = (raw: string) => {
+    const tel = raw.replace(/\s+/g, '');
+    Linking.openURL(`tel:${tel}`);
+  };
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Профиль */}
-      <View style={styles.profileSection}>
-        {user.photoURL ? (
-          <Image source={{ uri: user.photoURL }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, { backgroundColor: '#ccc', justifyContent: 'center', alignItems: 'center' }]}>
-            <Text style={{ color: '#fff', fontSize: 18 }}>{user.displayName?.[0] || '?'}</Text>
+    <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Шапка профиля */}
+        <View style={styles.profileSection}>
+          {photo ? (
+            <Image source={{ uri: photo }} style={styles.avatar} />
+          ) : (
+            <View
+              style={[
+                styles.avatar,
+                { backgroundColor: '#ccc', justifyContent: 'center', alignItems: 'center' },
+              ]}
+            >
+              <Text style={{ color: '#fff', fontSize: 18 }}>{name[0] || '?'}</Text>
+            </View>
+          )}
+          <Text style={styles.name}>{name}</Text>
+          <View style={styles.locationRow}>
+            <Text style={styles.location}>{email}</Text>
+            <TouchableOpacity
+              style={styles.settingsButton}
+              onPress={() => navigation.navigate('Settings')}
+            >
+              <Ionicons name="settings-outline" size={22} color="#666" />
+            </TouchableOpacity>
           </View>
-        )}
-        <Text style={styles.name}>{user.displayName || 'No Name'}</Text>
-        <View style={styles.locationRow}>
-          <Text style={styles.location}>{user.email}</Text>
-          <TouchableOpacity
-            style={styles.settingsButton}
-            onPress={() => navigation.navigate('Settings')}
-          >
-            <Ionicons name="settings-outline" size={22} color="#666" />
-          </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Инфо */}
-      <View style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.label}>Level</Text>
-          <View style={styles.levelBadge}>
-            <Text style={styles.badgeText}>4</Text>
-          </View>
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.label}>Favourite Sport</Text>
-          <View style={styles.sportBadge}>
-            <Text style={styles.sportText}>Padel</Text>
-          </View>
-        </View>
-      </View>
+        {/* Карточка UserProfile */}
+        <UserProfile
+          level={profile?.level}
+          favouriteSport={profile?.favouriteSport}
+          location={profile?.location}
+          phone={profile?.phone}
+          address={profile?.address}
+          updatedAt={profile?.updatedAt}
+          onPhonePress={callPhone}
+        />
 
-      {/* Выход */}
-      <TouchableOpacity
-        onPress={() =>
-          Alert.alert(
-            'Log Out',
-            'You are about to log out of your account.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Log Out',
-                style: 'default',
-                onPress: () => signOut(auth()),
-              },
-            ],
-            { cancelable: true }
-          )
-        }
-        style={{
-          marginTop: 30,
-          alignSelf: 'center',
-          backgroundColor: '#eee',
-          paddingVertical: 10,
-          paddingHorizontal: 24,
-          borderRadius: 12,
-        }}
-      >
-        <Text style={{ color: '#e63946', fontWeight: '600', fontSize: 16 }}>Log Out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {/* Выход */}
+        <TouchableOpacity
+          onPress={async () => {
+            try {
+              await signOut(auth);
+            } catch (e: any) {
+              Alert.alert('Ошибка', `Не удалось выйти: ${e?.message ?? 'unknown error'}`);
+            }
+          }}
+          activeOpacity={0.8}
+          style={styles.logoutButton}
+        >
+          <Text style={styles.logoutText}>Log Out</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
-export default UserProfile;
+export default ProfileScreen;
