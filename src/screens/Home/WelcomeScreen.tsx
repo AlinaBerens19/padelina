@@ -1,9 +1,10 @@
+import { collection, onSnapshot, query /*, orderBy, where */ } from '@react-native-firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { firestore } from '../../services/firebase/init';
+import { db } from '../../services/firebase/db'; // путь от текущего файла
 import { useSpinnerStore } from '../../store/spinnerStore';
-import { styles } from './HomeScreen.styles';
+import { styles } from './WelcomeScreen.styles';
 
 export type Match = {
   id: string;
@@ -13,25 +14,45 @@ export type Match = {
   price: number;
 };
 
-export default function HomeScreen() {
+export default function WelcomeScreen() {
   const [matches, setMatches] = useState<Match[]>([]);
 
   useEffect(() => {
-    const loadMatches = async () => {
-      const spinner = useSpinnerStore.getState();
-      try {
-        spinner.show('Loading matches...');
-        const snapshot = await firestore().collection('matches').get();
-        const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Match[];
+    const spinner = useSpinnerStore.getState();
+    spinner.show('Loading matches...');
+
+    // можно добавить сортировку/фильтр:
+    // const q = query(collection(db, 'matches'), where('sport', '==', 'Padel'), orderBy('price', 'asc'));
+    const q = query(collection(db, 'matches'));
+
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        const list: Match[] = snapshot.docs.map((docSnap) => {
+          const d = docSnap.data() as Record<string, any>;
+          return {
+            id: docSnap.id,
+            location: String(d.location ?? '—'),
+            level: Number.isFinite(Number(d.level)) ? Number(d.level) : 0,
+            sport: (['Tennis', 'Padel', 'Pickleball'].includes(d.sport)
+              ? d.sport
+              : 'Padel') as Match['sport'],
+            price: Number.isFinite(Number(d.price)) ? Number(d.price) : 0,
+          };
+        });
         setMatches(list);
-      } catch (e) {
+        spinner.hide();
+      },
+      (e) => {
         console.error('Failed to fetch matches:', e);
-      } finally {
         spinner.hide();
       }
-    };
+    );
 
-    loadMatches();
+    return () => {
+      spinner.hide();
+      unsub();
+    };
   }, []);
 
   const renderItem = ({ item }: { item: Match }) => (
