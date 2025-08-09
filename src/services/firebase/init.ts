@@ -1,9 +1,12 @@
-import authRN from '@react-native-firebase/auth';
-import firestoreRN from '@react-native-firebase/firestore';
-import storageRN from '@react-native-firebase/storage';
+// src/services/firebase/init.ts
+import { getApp } from '@react-native-firebase/app';
+import { getAuth } from '@react-native-firebase/auth';
+import { getFirestore } from '@react-native-firebase/firestore';
+import { getStorage } from '@react-native-firebase/storage';
 
-export const auth = authRN();        // инстанс
-export const db = firestoreRN();     // инстанс
-export const storage = storageRN();  // инстанс
+// Если проект один — можно просто getApp(), иначе передавайте сюда нужный app.
+export const firebaseApp = getApp();
 
-export const firebaseApp = auth.app; // если где-то нужен сам App
+export const auth = getAuth(firebaseApp);
+export const db = getFirestore(firebaseApp);
+export const storage = getStorage(firebaseApp);

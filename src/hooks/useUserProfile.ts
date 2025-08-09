@@ -1,6 +1,13 @@
-// hooks/useUserProfile.ts
-import firestore from '@react-native-firebase/firestore';
+// src/hooks/useUserProfile.ts
+import {
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  type FirebaseFirestoreTypes,
+} from '@react-native-firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
+import { db } from '../services/firebase/db'; // поправь путь под свой alias при необходимости
 
 export type Profile = {
   uid: string;
@@ -12,7 +19,7 @@ export type Profile = {
   avatarUrl?: string;
   address?: string;
   phone?: string;
-  updatedAt?: any;
+  updatedAt?: FirebaseFirestoreTypes.Timestamp | Date | null;
 };
 
 export function useUserProfile(uid?: string) {
@@ -27,15 +34,16 @@ export function useUserProfile(uid?: string) {
       return;
     }
     setLoading(true);
-    const ref = firestore().collection('users').doc(uid);
 
-    const unsub = ref.onSnapshot(
+    const ref = doc(db, 'users', uid);
+    const unsub = onSnapshot(
+      ref,
       snap => {
-        setData(snap.exists ? ({ uid: snap.id, ...(snap.data() as Profile) }) : null);
+        setData(snap.exists() ? ({ uid: snap.id, ...(snap.data() as Profile) }) : null);
         setLoading(false);
       },
       err => {
-        setError(err);
+        setError(err as Error);
         setLoading(false);
       }
     );
@@ -46,13 +54,12 @@ export function useUserProfile(uid?: string) {
   const update = useCallback(
     (patch: Partial<Profile>) => {
       if (!uid) return Promise.reject(new Error('No uid'));
-      return firestore()
-        .collection('users')
-        .doc(uid)
-        .set(
-          { ...patch, updatedAt: firestore.FieldValue.serverTimestamp() },
-          { merge: true }
-        );
+      const ref = doc(db, 'users', uid);
+      return setDoc(
+        ref,
+        { ...patch, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
     },
     [uid]
   );
