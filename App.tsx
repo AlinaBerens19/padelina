@@ -1,5 +1,4 @@
-// App.tsx
-import { getApp } from '@react-native-firebase/app';
+import auth from '@react-native-firebase/auth';
 import React from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -10,9 +9,9 @@ import AppNavigator from './src/navigation/AppNavigator';
 export default function App() {
   const { initializing, isAuthenticated } = useAuth();
 
-  // Модульный вызов вместо deprecated namespaced API:
-  const app = getApp();
-  console.log('✅ Firebase default app:', app.name);
+  React.useEffect(() => {
+    console.log('✅ Firebase default app:', auth().app.name); // [DEFAULT]
+  }, []);
 
   if (initializing) {
     return (
@@ -33,10 +32,5 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
 });
