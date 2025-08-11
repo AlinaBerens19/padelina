@@ -55,6 +55,26 @@ export const styles = StyleSheet.create({
     lineHeight: 22,
   },
 
+    avatarWrap: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    backgroundColor: '#ddd',
+  },
+  avatarFallback: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarFallbackText: {
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: '600',
+  },
+
   // Save button
   saveButton: {
     backgroundColor: '#ECFCCB',
