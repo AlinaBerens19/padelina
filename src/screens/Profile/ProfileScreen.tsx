@@ -26,6 +26,9 @@ import { styles } from './UserProfile.styles';
 type Profile = {
   level?: number;
   favouriteSport?: string;
+  /** новое поле из БД */
+  avatar?: string;
+  /** на всякий случай поддержим старое имя */
   avatarUrl?: string;
   name?: string;
   email?: string;
@@ -45,6 +48,7 @@ const ProfileScreen = () => {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [imageOk, setImageOk] = useState(true);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -56,6 +60,7 @@ const ProfileScreen = () => {
       snap => {
         setProfile(snap.exists() ? (snap.data() as Profile) : null);
         setLoading(false);
+        setImageOk(true); // при обновлении профиля попробуем снова показать картинку
       },
       err => {
         console.error('Firestore profile error:', err);
@@ -92,30 +97,46 @@ const ProfileScreen = () => {
   // Шапка: Firestore -> Firebase Auth -> заглушка
   const name = safeText(profile?.name ?? user.displayName);
   const email = safeText(profile?.email ?? user.email);
-  const photo = profile?.avatarUrl || user.photoURL;
+
+  // основное: читаем фото из поля `avatar` (и поддерживаем `avatarUrl`)
+  const photo =
+    (profile?.avatar && profile.avatar.trim()) ||
+    (profile?.avatarUrl && profile.avatarUrl.trim()) ||
+    (user.photoURL ?? '');
 
   const callPhone = (raw: string) => {
     const tel = raw.replace(/\s+/g, '');
     Linking.openURL(`tel:${tel}`);
   };
 
+  const FallbackAvatar = (
+    <View
+      style={[
+        styles.avatar,
+        { backgroundColor: '#ccc', justifyContent: 'center', alignItems: 'center' },
+      ]}
+    >
+      <Text style={{ color: '#fff', fontSize: 18 }}>{name[0] || '?'}</Text>
+    </View>
+  );
+
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.container}>
         {/* Шапка профиля */}
         <View style={styles.profileSection}>
-          {photo ? (
-            <Image source={{ uri: photo }} style={styles.avatar} />
+          {photo && imageOk ? (
+            <Image
+              source={{ uri: photo }}
+              style={styles.avatar}
+              onError={() => setImageOk(false)}
+              // можно раскомментировать, если есть локальный плейсхолдер
+              // defaultSource={require('../../../assets/avatar-placeholder.png')}
+            />
           ) : (
-            <View
-              style={[
-                styles.avatar,
-                { backgroundColor: '#ccc', justifyContent: 'center', alignItems: 'center' },
-              ]}
-            >
-              <Text style={{ color: '#fff', fontSize: 18 }}>{name[0] || '?'}</Text>
-            </View>
+            FallbackAvatar
           )}
+
           <Text style={styles.name}>{name}</Text>
           <View style={styles.locationRow}>
             <Text style={styles.location}>{email}</Text>
