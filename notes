@@ -1,2 +1,27 @@
 // После ребилда андроида добавить в корневую папку андроид файл local.properties
 // sdk.dir=C\:\\Users\\Alina\\AppData\\Local\\Android\\Sdk
+
+; # Локальные ветки (текущая помечена *)
+; git branch
+
+; # Локальные + удалённые
+; git branch -a
+
+; # Только удалённые
+; git branch -r
+
+; # С последним коммитом и апстримом
+; git branch -vv
+
+; # Отсортировать по времени последнего коммита (сверху — свежие)
+; git branch --sort=-committerdate -vv
+
+; # Граф всех веток (удобно понять развилки)
+; git log --oneline --decorate --graph --all --date-order
+
+; # Какие ветки уже слиты в текущую / ещё не слиты
+; git branch --merged
+; git branch --no-merged
+
+; # Обновить список удалённых веток (почистить удалённые)
+; git fetch --all --prune

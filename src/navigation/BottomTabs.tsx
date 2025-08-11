@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
-import WelcomeScreen from 'screens/Home/WelcomeScreen';
+import WelcomeScreen from 'screens/Matches/WelcomeScreen';
 import ProfileScreen from 'screens/Profile/ProfileScreen';
 import SettingsScreen from 'screens/Settings/SettingsScreen';
 // import Placeholder from 'components/Placeholder'; // не нужен если есть реальные экраны
