@@ -1,3 +1,4 @@
+// path: src/screens/SettingsScreen/SettingsScreen.tsx
 import {
   doc,
   getDoc,
@@ -8,6 +9,7 @@ import { Picker } from '@react-native-picker/picker';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   ScrollView,
   Text,
   TextInput,
@@ -16,7 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
-import { db } from '../../services/firebase/db'; // экспорт getFirestore(app)
+import { db } from '../../services/firebase/db';
 import { useSpinnerStore } from '../../store/spinnerStore';
 import { styles } from './SettingsScreen.styles';
 
@@ -33,6 +35,8 @@ const SettingsScreen = () => {
   const [favouriteSport, setFavouriteSport] = useState<string>('');
   const [phone, setPhone] = useState(''); // только цифры
   const [address, setAddress] = useState('');
+  const [avatar, setAvatar] = useState(user?.photoURL || '');
+  const [imageOk, setImageOk] = useState(true);
 
   // Подтягиваем дефолты из Firestore: users/{uid}
   useEffect(() => {
@@ -70,6 +74,14 @@ const SettingsScreen = () => {
             : '',
         );
         setAddress(typeof data.address === 'string' ? data.address : '');
+
+        // аватар: новое поле avatar, иначе Firebase Auth
+        setAvatar(
+          typeof data.avatar === 'string' && data.avatar.trim()
+            ? data.avatar.trim()
+            : user.photoURL || '',
+        );
+        setImageOk(true);
       } catch (e: any) {
         Alert.alert('Ошибка', e?.message || 'Не удалось загрузить профиль.');
       } finally {
@@ -78,7 +90,7 @@ const SettingsScreen = () => {
     };
 
     load();
-  }, [user?.uid, user?.displayName]);
+  }, [user?.uid, user?.displayName, user?.photoURL]);
 
   const handleSave = async () => {
     const spinner = useSpinnerStore.getState();
@@ -117,6 +129,8 @@ const SettingsScreen = () => {
         level: Number.isFinite(levelNum) ? levelNum : undefined,
       };
 
+      if (avatar?.trim()) payload.avatar = avatar.trim();
+
       const userRef = doc(db, 'users', user.uid);
       await setDoc(userRef, payload, { merge: true });
 
@@ -135,6 +149,23 @@ const SettingsScreen = () => {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.header}>Profile Settings</Text>
+
+        {/* Круглый аватар с фолбэком-инициалом */}
+        <View style={styles.avatarWrap}>
+          {avatar && imageOk ? (
+            <Image
+              source={{ uri: avatar }}
+              style={styles.avatar}
+              onError={() => setImageOk(false)}
+            />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarFallbackText}>
+                {(name || user?.displayName || '?').trim().charAt(0).toUpperCase() || '?'}
+              </Text>
+            </View>
+          )}
+        </View>
 
         <Text style={styles.label}>Full Name</Text>
         <TextInput
@@ -215,6 +246,7 @@ const SettingsScreen = () => {
           onPress={handleSave}
           style={styles.saveButton}
           disabled={loadingProfile}
+          activeOpacity={0.8}
         >
           <Text style={styles.saveText}>Save</Text>
         </TouchableOpacity>
