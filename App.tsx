@@ -1,4 +1,4 @@
-import auth from '@react-native-firebase/auth';
+import { getApp } from '@react-native-firebase/app';
 import React from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -10,7 +10,8 @@ export default function App() {
   const { initializing, isAuthenticated } = useAuth();
 
   React.useEffect(() => {
-    console.log('✅ Firebase default app:', auth().app.name); // [DEFAULT]
+    const app = getApp(); // вместо auth().app
+    console.log('✅ Firebase default app:', app.name); // [DEFAULT]
   }, []);
 
   if (initializing) {

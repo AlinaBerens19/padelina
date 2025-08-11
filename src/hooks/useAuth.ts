@@ -1,5 +1,6 @@
 // src/hooks/useAuth.ts
 import type { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { onAuthStateChanged } from '@react-native-firebase/auth'; // ⬅️ добавили модульную функцию
 import { useEffect, useState } from 'react';
 import { auth } from '../services/firebase/init';
 import { useAuthStore } from '../store/authStore';
@@ -11,14 +12,17 @@ export const useAuth = () => {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(
+    // ⬅️ вместо auth.onAuthStateChanged(...) вызываем модульную форму
+    const unsubscribe = onAuthStateChanged(
+      auth,
       (u: FirebaseAuthTypes.User | null) => {
         setUser(u);
         setInitializing(false);
       }
     );
+
     return unsubscribe;
-  }, [setUser]); // или []
+  }, [setUser]);
 
   return { user, isAuthenticated, initializing };
 };
