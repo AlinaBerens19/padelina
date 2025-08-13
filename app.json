@@ -8,42 +8,43 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "jsEngine": "hermes",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
+    "splash": { "image": "./assets/splash-icon.png", "resizeMode": "contain", "backgroundColor": "#ffffff" },
+
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.alinaberens.padelina",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Нужно для загрузки аватара",
+        "NSCameraUsageDescription": "Нужно для съёмки фото аватара",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.<REVERSED_CLIENT_ID>"
+            ]
+          }
+        ]
       },
-     
       "googleServicesFile": "./GoogleService-Info.plist"
     },
+
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
+      "adaptiveIcon": { "foregroundImage": "./assets/adaptive-icon.png", "backgroundColor": "#ffffff" },
       "edgeToEdgeEnabled": true,
       "package": "com.alinaberens.padelina",
-      
       "googleServicesFile": "./google-services.json"
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "fc81634b-3fc1-44a8-a369-f682608899d9"
-      }
-    },
+
+    "web": { "favicon": "./assets/favicon.png" },
+
+    "extra": { "eas": { "projectId": "fc81634b-3fc1-44a8-a369-f682608899d9" } },
     "owner": "alinaberens",
+
     "plugins": [
       "expo-dev-client",
       "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      "@react-native-google-signin/google-signin",
       ["expo-build-properties", {
         "android": { "minSdkVersion": 24, "targetSdkVersion": 35, "compileSdkVersion": 35 },
         "ios": { "deploymentTarget": "15.1", "useFrameworks": "static" }
