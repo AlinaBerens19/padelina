@@ -2,6 +2,7 @@
 // Динамический конфиг Expo: берём базу из app.json и подменяем пути к Firebase-файлам через EAS file env.
 // iOS: GOOGLE_SERVICE_INFO_PLIST (type: file)
 // Android (опционально): GOOGLE_SERVICES_JSON (type: file)
+// Дополнительно: добавляем useFrameworks: 'static' для iOS (RNFirebase) и пробрасываем GOOGLE_PLACES_KEY.
 
 const base = require('./app.json');
 const expo = base.expo || base; // на случай, если структура изменится
@@ -17,8 +18,12 @@ function fixIosUrlSchemes(ios) {
 
   const schemes = urlTypes[0]?.CFBundleURLSchemes || [];
 
-  const hasPlaceholder = schemes.some(s => typeof s === 'string' && s.includes('<REVERSED_CLIENT_ID>'));
-  const alreadyHasReversed = schemes.some(s => typeof s === 'string' && s.startsWith('com.googleusercontent.apps.'));
+  const hasPlaceholder = schemes.some(
+    (s) => typeof s === 'string' && s.includes('<REVERSED_CLIENT_ID>')
+  );
+  const alreadyHasReversed = schemes.some(
+    (s) => typeof s === 'string' && s.startsWith('com.googleusercontent.apps.')
+  );
 
   if (reversedFromEnv) {
     // Жёстко выставляем схему из env
@@ -32,40 +37,53 @@ function fixIosUrlSchemes(ios) {
   return { ...ios, infoPlist };
 }
 
+// Добавляем плагины без дублей
+function withPlugins(existing = []) {
+  const plugins = [...existing];
+  const add = (p) => {
+    const key = Array.isArray(p) ? p[0] : p;
+    const exists = plugins.some((x) => (Array.isArray(x) ? x[0] : x) === key);
+    if (!exists) plugins.push(p);
+  };
+
+  add('@react-native-firebase/app'); // RNFirebase auto-config
+  // при желании можно добавить и другие пакеты RNFirebase, но достаточно app
+  add(['expo-build-properties', { ios: { useFrameworks: 'static' } }]); // нужно для RNFirebase на iOS
+
+  return plugins;
+}
+
 module.exports = () => {
-  // iOS: путь к plist берём из EAS file env, иначе используем локальный
+  // iOS: путь к plist берём из EAS file env, иначе используем локальный (если задан в app.json)
   const ios = {
     ...(expo.ios || {}),
     googleServicesFile:
-      process.env.GOOGLE_SERVICE_INFO_PLIST || (expo.ios ? expo.ios.googleServicesFile : undefined),
+      process.env.GOOGLE_SERVICE_INFO_PLIST ||
+      (expo.ios ? expo.ios.googleServicesFile : undefined),
   };
-
-  // Подчистим CFBundleURLSchemes (убрать плейсхолдер или подставить из env)
   const iosFixed = fixIosUrlSchemes(ios);
 
   // Android: аналогично можно прокидывать google-services.json через EAS file env (опционально)
   const android = {
     ...(expo.android || {}),
     googleServicesFile:
-      process.env.GOOGLE_SERVICES_JSON || (expo.android ? expo.android.googleServicesFile : undefined),
+      process.env.GOOGLE_SERVICES_JSON ||
+      (expo.android ? expo.android.googleServicesFile : undefined),
   };
 
   return {
-    // Возвращаем конфиг Expo (то, что обычно внутри "expo" в app.json)
-    name: expo.name,
-    slug: expo.slug,
-    version: expo.version,
-    orientation: expo.orientation,
-    icon: expo.icon,
-    userInterfaceStyle: expo.userInterfaceStyle,
-    newArchEnabled: expo.newArchEnabled,
-    jsEngine: expo.jsEngine,
-    splash: expo.splash,
+    // возвращаем “внутренность” expo-конфига (как в app.json внутри "expo")
+    ...expo,
     ios: iosFixed,
     android,
-    web: expo.web,
-    extra: expo.extra,
-    owner: expo.owner,
-    plugins: expo.plugins,
+    extra: {
+      ...(expo.extra || {}),
+      GOOGLE_PLACES_KEY:
+        process.env.GOOGLE_PLACES_KEY ??
+        (expo.extra && expo.extra.GOOGLE_PLACES_KEY),
+      // при необходимости пробрасывай сюда и другие переменные
+      // e.g. API_BASE_URL: process.env.API_BASE_URL,
+    },
+    plugins: withPlugins(expo.plugins || []),
   };
 };
