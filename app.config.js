@@ -73,7 +73,7 @@ module.exports = () => {
     package:
       process.env.ANDROID_APPLICATION_ID ||
       (expoCfg.android && expoCfg.android.package) ||
-      'com.padelina.app',
+      'com.padelina.android',
   };
 
   return {

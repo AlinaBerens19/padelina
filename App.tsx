@@ -1,13 +1,14 @@
 // App.tsx
-import 'expo-dev-client'; // опционально
-import 'react-native-gesture-handler'; // 👍 навбар/жесты (первым)
-import 'react-native-get-random-values'; // uuid/crypto
+import 'expo-dev-client'; // dev-client (опционально)
+import 'react-native-gesture-handler'; // 👈 ОБЯЗАТЕЛЬНО самым первым
+import 'react-native-get-random-values'; // uuid/crypto (nonce)
 import './src/polyfills/networking'; // патч RN Networking (timeout/withCredentials)
 
 import { getApp } from '@react-native-firebase/app';
 import React from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+
 import SpinnerOverlay from './src/components/SpinnerOverlay';
 import { useAuth } from './src/hooks/useAuth';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -19,7 +20,10 @@ export default function App() {
   const { initializing, isAuthenticated } = useAuth();
 
   React.useEffect(() => {
+    // Инициализация Google Sign-In один раз на старте
     configureGoogleSignIn();
+
+    // Проверка, что Firebase [DEFAULT] поднят
     try {
       const app = getApp();
       console.log('✅ Firebase default app:', app.name);
