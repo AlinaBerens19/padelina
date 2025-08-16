@@ -4,8 +4,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 
 // экраны Auth
+import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
-import LoginScreen from '../screens/LoginScreen';
 
 // экраны Main
 import SettingsScreen from '../screens/Settings/SettingsScreen';
