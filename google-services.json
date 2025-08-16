@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "161323421831",
+    "project_id": "padelina-1912",
+    "storage_bucket": "padelina-1912.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:161323421831:android:43275d242e6a9cbe512822",
+        "android_client_info": {
+          "package_name": "com.padelina.android"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "161323421831-ld0tbp6npp9uq86rahrotegrl41qn3gh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.padelina.android",
+            "certificate_hash": "60d6ac21f5747d257f1e749b822567840cb0022a"
+          }
+        },
+        {
+          "client_id": "161323421831-88kdio2q0i5gjmv992cc9g9040d2bnd4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDt48jCpXyKkvhZVJPhhBvUd2s0TZedaJY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "161323421831-88kdio2q0i5gjmv992cc9g9040d2bnd4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "161323421831-cjav8h1abvdiclmdl1k2c910tpq5rhfv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.israel.padelina"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
