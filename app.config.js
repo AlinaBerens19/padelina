@@ -1,21 +1,19 @@
 // app.config.js
-// Динамический конфиг Expo: берём базу из app.json и подменяем пути к Firebase-файлам через EAS file env.
+// Динамический конфиг Expo: Firebase files через EAS file env.
 // iOS: GOOGLE_SERVICE_INFO_PLIST (type: file)
-// Android (опционально): GOOGLE_SERVICES_JSON (type: file)
-// Дополнительно: добавляем useFrameworks: 'static' для iOS (RNFirebase) и пробрасываем GOOGLE_PLACES_KEY.
+// Android: GOOGLE_SERVICES_JSON (type: file) — опционально
+// Плагины: RNFirebase, expo-build-properties (iOS static frameworks), Google Sign-In, Apple Auth.
 
 const base = require('./app.json');
-const expo = base.expo || base; // на случай, если структура изменится
+const expoCfg = base.expo || base; // <= НЕ "expo", чтобы не ловить ReferenceError
 
 function fixIosUrlSchemes(ios) {
-  const reversedFromEnv = process.env.REVERSED_CLIENT_ID; // можно задать в EAS env, если нужно
+  const reversedFromEnv = process.env.REVERSED_CLIENT_ID;
   const infoPlist = { ...(ios.infoPlist || {}) };
 
-  // Если в URL-схемах остался плейсхолдер — заменяем/добавляем реальное значение
   const urlTypes = Array.isArray(infoPlist.CFBundleURLTypes)
     ? [...infoPlist.CFBundleURLTypes]
     : [];
-
   const schemes = urlTypes[0]?.CFBundleURLSchemes || [];
 
   const hasPlaceholder = schemes.some(
@@ -26,18 +24,14 @@ function fixIosUrlSchemes(ios) {
   );
 
   if (reversedFromEnv) {
-    // Жёстко выставляем схему из env
     infoPlist.CFBundleURLTypes = [{ CFBundleURLSchemes: [reversedFromEnv] }];
   } else if (hasPlaceholder || !alreadyHasReversed) {
-    // Если есть плейсхолдер или схемы нет вовсе — оставляем как есть (плагин google-signin подтянет из plist),
-    // либо можно руками заменить тут — когда узнаешь реальный REVERSED_CLIENT_ID.
-    // infoPlist.CFBundleURLTypes = [{ CFBundleURLSchemes: ['com.googleusercontent.apps.XYZ...'] }];
+    // плагин @react-native-google-signin/google-signin подтянет схему из GoogleService-Info.plist
   }
 
   return { ...ios, infoPlist };
 }
 
-// Добавляем плагины без дублей
 function withPlugins(existing = []) {
   const plugins = [...existing];
   const add = (p) => {
@@ -46,44 +40,57 @@ function withPlugins(existing = []) {
     if (!exists) plugins.push(p);
   };
 
-  add('@react-native-firebase/app'); // RNFirebase auto-config
-  // при желании можно добавить и другие пакеты RNFirebase, но достаточно app
-  add(['expo-build-properties', { ios: { useFrameworks: 'static' } }]); // нужно для RNFirebase на iOS
+  add('@react-native-firebase/app');
+  add(['expo-build-properties', { ios: { useFrameworks: 'static' } }]);
+  add('@react-native-google-signin/google-signin');
+  add('expo-apple-authentication');
 
   return plugins;
 }
 
 module.exports = () => {
-  // iOS: путь к plist берём из EAS file env, иначе используем локальный (если задан в app.json)
   const ios = {
-    ...(expo.ios || {}),
+    ...(expoCfg.ios || {}),
     googleServicesFile:
       process.env.GOOGLE_SERVICE_INFO_PLIST ||
-      (expo.ios ? expo.ios.googleServicesFile : undefined),
+      (expoCfg.ios ? expoCfg.ios.googleServicesFile : undefined),
+
+    // bundle id можно задать через env
+    bundleIdentifier:
+      process.env.IOS_BUNDLE_ID ||
+      (expoCfg.ios && expoCfg.ios.bundleIdentifier) ||
+      'com.padelina.app',
   };
   const iosFixed = fixIosUrlSchemes(ios);
 
-  // Android: аналогично можно прокидывать google-services.json через EAS file env (опционально)
   const android = {
-    ...(expo.android || {}),
+    ...(expoCfg.android || {}),
     googleServicesFile:
       process.env.GOOGLE_SERVICES_JSON ||
-      (expo.android ? expo.android.googleServicesFile : undefined),
+      (expoCfg.android ? expoCfg.android.googleServicesFile : undefined),
+
+    // application id (Android package)
+    package:
+      process.env.ANDROID_APPLICATION_ID ||
+      (expoCfg.android && expoCfg.android.package) ||
+      'com.padelina.app',
   };
 
   return {
-    // возвращаем “внутренность” expo-конфига (как в app.json внутри "expo")
-    ...expo,
-    ios: iosFixed,
+    // возвращаем базовые поля из app.json
+    ...expoCfg,
+    ios: { ...iosFixed, usesAppleSignIn: true },
     android,
     extra: {
-      ...(expo.extra || {}),
+      ...(expoCfg.extra || {}),
       GOOGLE_PLACES_KEY:
         process.env.GOOGLE_PLACES_KEY ??
-        (expo.extra && expo.extra.GOOGLE_PLACES_KEY),
-      // при необходимости пробрасывай сюда и другие переменные
-      // e.g. API_BASE_URL: process.env.API_BASE_URL,
+        (expoCfg.extra && expoCfg.extra.GOOGLE_PLACES_KEY),
+
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID:
+        process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
+        (expoCfg.extra && expoCfg.extra.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID),
     },
-    plugins: withPlugins(expo.plugins || []),
+    plugins: withPlugins(expoCfg.plugins || []),
   };
 };
