@@ -29,11 +29,12 @@ import {
 
 // Apple Sign-In (Expo)
 import * as AppleAuthentication from 'expo-apple-authentication';
-import * as Crypto from 'expo-crypto';
-import * as Random from 'expo-random';
-import { styles } from './styles/RegisterScreen.styles';
 
-// ✅ стили
+// 🔐 SHA-256 без expo-crypto
+import { sha256 } from '@noble/hashes/sha256';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils';
+
+import { styles } from './styles/RegisterScreen.styles';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Register'>;
@@ -45,7 +46,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [password, setPassword] = useState('');
 
   // phone
-  const [phone, setPhone] = useState(''); // в формате +9725.... (E.164)
+  const [phone, setPhone] = useState(''); // +9725...
   const [code, setCode] = useState('');
   const [confirm, setConfirm] =
     useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
@@ -54,7 +55,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const appleAvailable = useAppleAvailable();
 
-  // ========= helpers =========
+  // ===== helpers =====
   const ensureUserDoc = async (user: FirebaseAuthTypes.User) => {
     try {
       await firestore()
@@ -74,7 +75,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // ========= email/password =========
+  // ===== email/password =====
   const handleRegisterEmail = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Email and password are required');
@@ -95,14 +96,11 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // ========= phone =========
+  // ===== phone =====
   const sendPhoneCode = async () => {
     const phoneE164 = phone.trim();
     if (!phoneE164.startsWith('+')) {
-      Alert.alert(
-        'Phone',
-        'Введите номер в международном формате, например +9725...'
-      );
+      Alert.alert('Phone', 'Введите номер в международном формате, например +9725...');
       return;
     }
     try {
@@ -134,25 +132,20 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // ========= Google (через getTokens) =========
+  // ===== Google (через getTokens) =====
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
 
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
-      // 1) открываем нативный диалог входа
       const response = await GoogleSignin.signIn();
-
-      // 2) корректно обрабатываем union-ответ
       if (isCancelledResponse(response)) return;
       if (!isSuccessResponse(response)) throw new Error('Google sign-in failed');
 
-      // 3) берём токены отдельным вызовом
       const { idToken } = await GoogleSignin.getTokens();
       if (!idToken) throw new Error('No Google idToken');
 
-      // 4) Firebase credential
       const googleCredential = authRN.GoogleAuthProvider.credential(idToken);
       const { user } = await authRN().signInWithCredential(googleCredential);
 
@@ -166,21 +159,18 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // ========= Apple (iOS) =========
+  // ===== Apple (iOS) без expo-crypto =====
   const signInWithApple = async () => {
     try {
       setLoading(true);
 
-      const rawNonce = await getSecureRandomHex(16);
-      const hashedNonce = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        rawNonce
-      );
+      const rawNonce = getSecureRandomHex(16); // синхронно
+      const hashedNonce = sha256Hex(rawNonce); // SHA-256 hex
 
       const apple = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
         nonce: hashedNonce,
       });
@@ -305,12 +295,17 @@ function useAppleAvailable() {
   return available;
 }
 
-/** Генерируем криптографически стойкую HEX-строку (для rawNonce) */
-async function getSecureRandomHex(lenBytes = 16): Promise<string> {
-  const bytes = await Random.getRandomBytesAsync(lenBytes);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+/** Случайный HEX без expo-random (использует polyfill getRandomValues) */
+function getSecureRandomHex(lenBytes = 16): string {
+  const bytes = new Uint8Array(lenBytes);
+  // @ts-ignore - polyfill добавляет global.crypto
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** SHA-256 в hex (без expo-crypto) */
+function sha256Hex(s: string): string {
+  return bytesToHex(sha256(utf8ToBytes(s)));
 }
 
 export default RegisterScreen;
