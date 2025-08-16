@@ -19,7 +19,8 @@ import {
   query /* , where, orderBy */
 } from '@react-native-firebase/firestore';
 
-import { db } from '../../services/firebase/db';
+import { db } from '../../services/firebase/init'; // ✅ централизованная инициализация
+
 import { useSpinnerStore } from '../../store/spinnerStore';
 import { styles } from './WelcomeScreen.styles';
 

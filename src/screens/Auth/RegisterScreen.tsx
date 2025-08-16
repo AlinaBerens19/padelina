@@ -1,6 +1,3 @@
-// path: src/screens/RegisterScreen.tsx
-import 'react-native-get-random-values';
-
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import {
@@ -13,15 +10,23 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import 'react-native-get-random-values';
 import type { RootStackParamList } from '../../navigation/types';
 
-// Firebase Auth (RNFirebase)
-import authRN, {
+// Firebase (через init)
+
+import {
   AppleAuthProvider,
+  createUserWithEmailAndPassword,
   FirebaseAuthTypes,
   GoogleAuthProvider,
+  signInWithCredential,
+  signInWithPhoneNumber,
 } from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
+import {
+  doc,
+  setDoc,
+} from '@react-native-firebase/firestore';
 
 // Google Sign-In
 import {
@@ -30,13 +35,14 @@ import {
   isSuccessResponse,
 } from '@react-native-google-signin/google-signin';
 
-// Apple Sign-In (Expo)
+// Apple Sign-In
 import * as AppleAuthentication from 'expo-apple-authentication';
 
-// 🔐 SHA-256 без expo-crypto
+// SHA-256
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils';
 
+import { auth, db } from 'services/firebase/init';
 import { styles } from './styles/RegisterScreen.styles';
 
 type Props = {
@@ -54,12 +60,17 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
   const ensureUserDoc = async (user: FirebaseAuthTypes.User) => {
     try {
-      await firestore().collection('users').doc(user.uid).set({
-        id: user.uid,
-        email: user.email ?? null,
-        name: user.displayName ?? '',
-        phone: user.phoneNumber ?? null,
-      }, { merge: true });
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(
+        userRef,
+        {
+          id: user.uid,
+          email: user.email ?? null,
+          name: user.displayName ?? '',
+          phone: user.phoneNumber ?? null,
+        },
+        { merge: true }
+      );
     } catch (e) {
       console.warn('ensureUserDoc error', e);
     }
@@ -72,7 +83,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
     try {
       setLoading(true);
-      const cred = await authRN().createUserWithEmailAndPassword(email.trim(), password);
+      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await ensureUserDoc(cred.user);
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (e: any) {
@@ -90,7 +101,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
     try {
       setLoading(true);
-      const confirmation = await authRN().signInWithPhoneNumber(phoneE164);
+      const confirmation = await signInWithPhoneNumber(auth, phoneE164);
       setConfirm(confirmation);
       Alert.alert('SMS sent', 'Введите код из SMS');
     } catch (e: any) {
@@ -130,7 +141,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       if (!idToken) throw new Error('No Google idToken');
 
       const credential = GoogleAuthProvider.credential(idToken);
-      const { user } = await authRN().signInWithCredential(credential);
+      const { user } = await signInWithCredential(auth, credential);
 
       await ensureUserDoc(user);
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
@@ -164,7 +175,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         rawNonce
       );
 
-      const { user } = await authRN().signInWithCredential(credential);
+      const { user } = await signInWithCredential(auth, credential);
       await ensureUserDoc(user);
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (e: any) {

@@ -14,10 +14,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { getAuth, signOut } from '@react-native-firebase/auth';
+import { signOut } from '@react-native-firebase/auth';
 import { doc, onSnapshot } from '@react-native-firebase/firestore';
 
 import UserProfile from 'components/UserProfile';
+import { auth } from 'services/firebase/init';
 import { useAuth } from '../../hooks/useAuth';
 import type { RootStackParamList } from '../../navigation/types';
 import { db } from '../../services/firebase/db';
@@ -39,8 +40,6 @@ type Profile = {
 };
 
 const safeText = (v?: string | null) => (v && v.trim().length ? v.trim() : '—');
-
-const auth = getAuth();
 
 const ProfileScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();

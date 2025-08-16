@@ -1,28 +1,30 @@
-import {
-  getAuth,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
-} from '@react-native-firebase/auth';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Keyboard,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { RootStackParamList } from '../navigation/types';
+import { RootStackParamList } from '../../navigation/types';
+
+import {
+  GoogleAuthProvider,
+  sendPasswordResetEmail,
+  signInWithCredential,
+  signInWithEmailAndPassword,
+} from '@react-native-firebase/auth';
+import { GoogleSignin, isCancelledResponse, isSuccessResponse } from '@react-native-google-signin/google-signin';
+import { auth } from '../../services/firebase/init';
+import { styles } from './styles/RegisterScreen.styles';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
 };
-
-const auth = getAuth(); // модульный инстанс
 
 const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -60,46 +62,68 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  const signInWithGoogle = async () => {
+    try {
+      setLoading(true);
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const response = await GoogleSignin.signIn();
+      if (isCancelledResponse(response)) return;
+      if (!isSuccessResponse(response)) throw new Error('Google sign-in failed');
+      const { idToken } = await GoogleSignin.getTokens();
+      if (!idToken) throw new Error('No Google idToken');
+
+      const credential = GoogleAuthProvider.credential(idToken);
+      await signInWithCredential(auth, credential);
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      if (!/cancel/i.test(msg)) Alert.alert('Google Sign-In', msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
       <View style={styles.container}>
-        <Text style={styles.title}>Padelina</Text>
+        <Text style={styles.title}>Log In</Text>
 
         <TextInput
           style={styles.input}
           placeholder="Email"
           autoCapitalize="none"
-          autoCorrect={false}
           keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
-          editable={!loading}
         />
+
         <TextInput
           style={styles.input}
           placeholder="Password"
           secureTextEntry
           value={password}
           onChangeText={setPassword}
-          editable={!loading}
         />
 
-        <TouchableOpacity
-          onPress={handleLogin}
-          disabled={loading}
-          activeOpacity={0.8}
-          style={[styles.btn, loading && styles.btnDisabled]}
-        >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Login</Text>}
+        <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin} disabled={loading}>
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Login</Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Register')} style={styles.linkBtn}>
-          <Text style={styles.linkText}>Create account</Text>
+        <TouchableOpacity style={styles.secondaryBtn} onPress={handleForgot} disabled={loading}>
+          <Text style={styles.secondaryText}>Forgot password?</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleForgot} style={styles.linkBtn}>
-          <Text style={styles.linkText}>Forgot password?</Text>
+        <Text style={styles.sep}>OR</Text>
+
+        <TouchableOpacity style={styles.googleBtn} onPress={signInWithGoogle} disabled={loading}>
+          <Text style={styles.googleText}>Continue with Google</Text>
         </TouchableOpacity>
+
+        <View style={{ marginTop: 16 }}>
+          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+            <Text style={styles.secondaryText}>Create account</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -122,20 +146,5 @@ const mapAuthError = (code?: string, fallback = 'Something went wrong') => {
       return fallback;
   }
 };
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
-  container: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#fff' },
-  title: { fontSize: 32, fontWeight: 'bold', textAlign: 'center', marginBottom: 40 },
-  input: {
-    borderWidth: 1, borderColor: '#ccc', borderRadius: 8,
-    padding: 12, marginBottom: 16, fontSize: 16, backgroundColor: '#fff',
-  },
-  btn: { backgroundColor: '#111827', paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  linkBtn: { marginTop: 12, alignItems: 'center' },
-  linkText: { color: '#2563eb', fontWeight: '600' },
-});
 
 export default LoginScreen;
