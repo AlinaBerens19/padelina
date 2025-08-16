@@ -1,27 +1,27 @@
 {
-  "cli": { "version": ">= 13.0.0" },
+  "cli": { "version": ">= 13.0.0", "appVersionSource": "remote" },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
       "env": {
         "IOS_BUNDLE_ID": "com.padelina.app",
         "ANDROID_APPLICATION_ID": "com.padelina.android",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "161323421831-88kdio2q0i5gjmv992cc9g9040d2bnd4.apps.googleusercontent.com",
-        "GOOGLE_PLACES_KEY": "AIzaSyB9iXSD5w37UkIaqH5tvS8P-N8OPuBu6K8"
+        "EAS_SKIP_AUTO_FINGERPRINT": "1"
       },
       "ios": { "resourceClass": "m-medium" }
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
       "ios": { "resourceClass": "m-medium" }
     },
     "production": {
       "autoIncrement": true,
+      "environment": "production",
       "ios": { "resourceClass": "m-medium" }
     }
   },
-  "submit": {
-    "production": {}
-  }
+  "submit": { "production": {} }
 }
