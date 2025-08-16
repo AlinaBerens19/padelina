@@ -1,5 +1,4 @@
 // path: src/screens/SettingsScreen/SettingsScreen.tsx
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {
   doc,
   getDoc,
@@ -7,10 +6,10 @@ import {
   setDoc,
 } from '@react-native-firebase/firestore';
 import { Picker } from '@react-native-picker/picker';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
-  Image,
   Platform,
   ScrollView,
   Text,
@@ -19,31 +18,30 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { IOSSelect } from 'screens/Settings/components/IOSSelect';
+import { PlacePickerModal } from 'screens/Settings/components/PlacePickerModal';
+import { Coords, SPORTS } from 'screens/Settings/constants';
 import { styles } from '../../../styles/SettingsScreen.styles';
 import { useAuth } from '../../hooks/useAuth';
+import { RootStackParamList } from '../../navigation/types';
 import { db } from '../../services/firebase/db';
 import { useSpinnerStore } from '../../store/spinnerStore';
-import { AvatarEditorModal } from './components/AvatarEditorModal';
-import { IOSSelect } from './components/IOSSelect';
-import { PlacePickerModal } from './components/PlacePickerModal';
-import { Coords, LEVELS, SPORTS } from './constants';
 
-const SettingsScreen = () => {
+type Props = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'UserProfile'>;
+};
+
+const UserProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
+  const spinner = useSpinnerStore.getState();
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   // form fields
   const [name, setName] = useState(user?.displayName || '');
   const [location, setLocation] = useState('');
-  const [level, setLevel] = useState<string>(''); // строка из LEVELS
   const [favouriteSport, setFavouriteSport] = useState<string>('');
-  const [phone, setPhone] = useState(''); // только цифры
+  const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-
-  // avatar
-  const [avatar, setAvatar] = useState(user?.photoURL || '');
-  const [imageOk, setImageOk] = useState(true);
-  const [editingAvatar, setEditingAvatar] = useState(false);
 
   // places
   const [showCityPicker, setShowCityPicker] = useState(false);
@@ -51,7 +49,6 @@ const SettingsScreen = () => {
   const [locationCoords, setLocationCoords] = useState<Coords | null>(null);
   const [addressCoords, setAddressCoords] = useState<Coords | null>(null);
 
-  // load profile
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -68,7 +65,6 @@ const SettingsScreen = () => {
             : user.displayName || '',
         );
 
-        // location + coords
         setLocation(typeof data.location === 'string' ? data.location : '');
         const locLat = typeof data.locationLat === 'number' ? data.locationLat : undefined;
         const locLng = typeof data.locationLng === 'number' ? data.locationLng : undefined;
@@ -78,7 +74,6 @@ const SettingsScreen = () => {
             : null
         );
 
-        // address + coords
         setAddress(typeof data.address === 'string' ? data.address : '');
         const addrLat = typeof data.addressLat === 'number' ? data.addressLat : undefined;
         const addrLng = typeof data.addressLng === 'number' ? data.addressLng : undefined;
@@ -88,33 +83,12 @@ const SettingsScreen = () => {
             : null
         );
 
-        // level/sport
-        const lvlStr =
-          typeof data.level === 'number'
-            ? String(data.level)
-            : typeof data.level === 'string'
-            ? data.level
-            : '';
-        setLevel(LEVELS.includes(lvlStr as any) ? lvlStr : '');
-
-        const sportStr =
-          typeof data.favouriteSport === 'string' ? data.favouriteSport : '';
-        setFavouriteSport(SPORTS.includes(sportStr as any) ? sportStr : '');
-
-        // phone
         setPhone(
           typeof data.phone === 'string'
             ? data.phone.replace(/\D/g, '').slice(0, 10)
             : '',
         );
 
-        // avatar
-        const avatarUrl =
-          typeof data.avatar === 'string' && data.avatar.trim()
-            ? data.avatar.trim()
-            : user.photoURL || '';
-        setAvatar(avatarUrl);
-        setImageOk(true);
       } catch (e: any) {
         Alert.alert('Ошибка', e?.message || 'Не удалось загрузить профиль.');
       } finally {
@@ -126,7 +100,6 @@ const SettingsScreen = () => {
   }, [user?.uid, user?.displayName, user?.photoURL]);
 
   const handleSave = async () => {
-    const spinner = useSpinnerStore.getState();
     try {
       spinner.show('Saving...');
       if (!user) throw new Error('User not found');
@@ -140,12 +113,6 @@ const SettingsScreen = () => {
         Alert.alert('Validation', 'Please select your favourite sport.');
         return;
       }
-      if (!LEVELS.includes(level as any)) {
-        Alert.alert('Validation', 'Please select your level.');
-        return;
-      }
-
-      const levelNum = parseFloat(level);
 
       const payload: Record<string, any> = {
         uid: user.uid,
@@ -156,11 +123,8 @@ const SettingsScreen = () => {
         address: address.trim(),
         email: user.email,
         updatedAt: serverTimestamp(),
-        level: Number.isFinite(levelNum) ? levelNum : undefined,
-        avatar: avatar?.trim() || '',
       };
 
-      // coords
       if (locationCoords) {
         payload.locationLat = locationCoords.lat;
         payload.locationLng = locationCoords.lng;
@@ -174,6 +138,8 @@ const SettingsScreen = () => {
       await setDoc(userRef, payload, { merge: true });
 
       Alert.alert('Saved', 'Your changes have been saved.');
+      // Исправленный вызов навигации с передачей параметра
+      navigation.navigate('UserLevel', { userId: user.uid });
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not save profile.');
     } finally {
@@ -183,39 +149,17 @@ const SettingsScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.header}>Profile Settings</Text>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
-        {/* Avatar */}
-        <View style={styles.avatarOuter}>
-          {avatar && imageOk ? (
-            <Image
-              source={{ uri: avatar }}
-              style={styles.avatar}
-              onError={() => setImageOk(false)}
-            />
-          ) : (
-            <View style={[styles.avatar, styles.avatarFallback]}>
-              <Text style={styles.avatarFallbackText}>
-                {(name || user?.displayName || '?').trim().charAt(0).toUpperCase() || '?'}
-              </Text>
-            </View>
-          )}
 
-          <TouchableOpacity
-            onPress={() => setEditingAvatar(true)}
-            activeOpacity={0.9}
-            style={styles.avatarEditBtn}
-          >
-            <MaterialCommunityIcons name="pencil" size={16} color="#fff" />
-          </TouchableOpacity>
-        </View>
+        {/* <View style={[styles.avatar, styles.avatarFallback]}>
+          <Text style={styles.avatarFallbackText}>
+            {(name || user?.displayName || '?').trim().charAt(0).toUpperCase() || '?'}
+          </Text>
+        </View> */}
 
         {/* Name */}
-        <Text style={styles.label}>Full Name</Text>
+        <Text style={styles.label}>Full Name *</Text>
         <TextInput
           value={name}
           onChangeText={setName}
@@ -224,62 +168,24 @@ const SettingsScreen = () => {
           placeholder={loadingProfile ? 'Loading...' : 'Enter full name'}
         />
 
-        {/* Location (place picker) */}
+        {/* Location */}
         <Text style={styles.label}>Location</Text>
-        <TouchableOpacity
-          style={styles.inputPressable}
-          onPress={() => setShowCityPicker(true)}
-          activeOpacity={0.8}
-        >
+        <TouchableOpacity style={styles.inputPressable} onPress={() => setShowCityPicker(true)} activeOpacity={0.8}>
           <Text style={location ? styles.inputPressableText : styles.inputPressablePlaceholder}>
             {location || (loadingProfile ? 'Loading...' : 'City, Country')}
           </Text>
         </TouchableOpacity>
 
-        {/* Address (place picker) */}
+        {/* Address */}
         <Text style={styles.label}>Address</Text>
-        <TouchableOpacity
-          style={styles.inputPressable}
-          onPress={() => setShowAddressPicker(true)}
-          activeOpacity={0.8}
-        >
+        <TouchableOpacity style={styles.inputPressable} onPress={() => setShowAddressPicker(true)} activeOpacity={0.8}>
           <Text style={address ? styles.inputPressableText : styles.inputPressablePlaceholder}>
             {address || (loadingProfile ? 'Loading...' : 'Street, Building, etc.')}
           </Text>
         </TouchableOpacity>
 
-        {/* Level */}
-        <Text style={styles.label}>Level</Text>
-        {Platform.OS === 'ios' ? (
-          <IOSSelect
-            value={level}
-            onChange={(v) => setLevel(String(v))}
-            options={LEVELS}
-            placeholder="Select level"
-            loading={loadingProfile}
-          />
-        ) : (
-          <View style={styles.pickerWrapper}>
-            <Picker
-              selectedValue={level}
-              onValueChange={(v) => setLevel(String(v))}
-              style={styles.picker}
-              mode="dropdown"
-              dropdownIconColor="#111"
-            >
-              <Picker.Item
-                label={loadingProfile ? 'Loading...' : 'Select level'}
-                value=""
-              />
-              {LEVELS.map((lvl) => (
-                <Picker.Item key={lvl} label={lvl} value={lvl} />
-              ))}
-            </Picker>
-          </View>
-        )}
-
         {/* Favourite Sport */}
-        <Text style={styles.label}>Favourite Sport</Text>
+        <Text style={styles.label}>Favourite Sport *</Text>
         {Platform.OS === 'ios' ? (
           <IOSSelect
             value={favouriteSport}
@@ -297,10 +203,7 @@ const SettingsScreen = () => {
               mode="dropdown"
               dropdownIconColor="#111"
             >
-              <Picker.Item
-                label={loadingProfile ? 'Loading...' : 'Select sport'}
-                value=""
-              />
+              <Picker.Item label={loadingProfile ? 'Loading...' : 'Select sport'} value="" />
               {SPORTS.map((s) => (
                 <Picker.Item key={s} label={s} value={s} />
               ))}
@@ -309,7 +212,7 @@ const SettingsScreen = () => {
         )}
 
         {/* Phone */}
-        <Text style={styles.label}>Phone</Text>
+        <Text style={styles.label}>Phone *</Text>
         <TextInput
           value={phone}
           onChangeText={(t) => setPhone(t.replace(/\D/g, '').slice(0, 10))}
@@ -319,32 +222,10 @@ const SettingsScreen = () => {
           maxLength={10}
         />
 
-        <TouchableOpacity
-          onPress={handleSave}
-          style={styles.saveButton}
-          disabled={loadingProfile}
-          activeOpacity={0.8}
-        >
+        <TouchableOpacity onPress={handleSave} style={styles.saveButton} disabled={loadingProfile} activeOpacity={0.8}>
           <Text style={styles.saveText}>Save</Text>
         </TouchableOpacity>
       </ScrollView>
-
-      {/* Modals */}
-      <AvatarEditorModal
-        visible={editingAvatar}
-        initialUrl={avatar}
-        onClose={() => setEditingAvatar(false)}
-        onConfirm={(url) => {
-          setAvatar(url);
-          setImageOk(true);
-          setEditingAvatar(false);
-        }}
-        onClear={() => {
-          setAvatar('');
-          setImageOk(true);
-          setEditingAvatar(false);
-        }}
-      />
 
       <PlacePickerModal
         visible={showCityPicker}
@@ -369,4 +250,4 @@ const SettingsScreen = () => {
   );
 };
 
-export default SettingsScreen;
+export default UserProfileScreen;

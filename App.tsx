@@ -6,7 +6,7 @@ import './src/polyfills/networking'; // патч RN Networking (timeout/withCred
 
 import { getApp } from '@react-native-firebase/app';
 import React from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import SpinnerOverlay from './src/components/SpinnerOverlay';
@@ -35,12 +35,13 @@ export default function App() {
   if (initializing) {
     return (
       <SafeAreaProvider>
-        <SafeAreaView style={styles.center}>
-          <Text>Initializing App...</Text>
+        <SafeAreaView style={styles.spinnerScreen}>
+          <SpinnerOverlay />
         </SafeAreaView>
       </SafeAreaProvider>
     );
   }
+
 
   return (
     <SafeAreaProvider>
@@ -52,4 +53,11 @@ export default function App() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
+  spinnerScreen: {
+    flex: 1,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
+

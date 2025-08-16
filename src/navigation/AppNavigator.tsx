@@ -11,6 +11,8 @@ import RegisterScreen from '../screens/Auth/RegisterScreen';
 import SettingsScreen from '../screens/Settings/SettingsScreen';
 import BottomTabs from './BottomTabs';
 
+import UserLevelScreen from 'screens/User/UserLevelScreen';
+import UserProfileScreen from 'screens/User/UserProfileScreen';
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -22,22 +24,21 @@ type Props = {
 export default function AppNavigator({ isAuthenticated }: Props) {
   return (
     <NavigationContainer>
-      {isAuthenticated ? (
-        // Основной стек для авторизованных пользователей
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {/* Основная вкладочная навигация */}
-          <Stack.Screen name="Home" component={BottomTabs} />
-
-          {/* Дополнительные экраны */}
-          <Stack.Screen name="Settings"    component={SettingsScreen} />
-        </Stack.Navigator>
-      ) : (
-        // Стек для неавторизованных (Login / Register)
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Login"    component={LoginScreen} />
-          <Stack.Screen name="Register" component={RegisterScreen} />
-        </Stack.Navigator>
-      )}
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {isAuthenticated ? (
+          <>
+            <Stack.Screen name="Home" component={BottomTabs} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+            <Stack.Screen name="UserLevel" component={UserLevelScreen} />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+          </>
+        )}
+      </Stack.Navigator>
     </NavigationContainer>
   );
 }

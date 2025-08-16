@@ -7,4 +7,6 @@ export type RootStackParamList = {
   Profile: undefined;
   Search: undefined;
   Settings: undefined;
+  UserProfile: { userId: string };
+  UserLevel: { userId: string };
 };

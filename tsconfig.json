@@ -8,5 +8,5 @@
       "*": ["*", "store/*"]
     }
   },
-  "include": ["src", "src/types", "*"]
+  "include": ["src", "src/types", "*", "styles/SettingsScreen.styles.ts"]
 }
