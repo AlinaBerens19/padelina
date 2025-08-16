@@ -1,3 +1,4 @@
+// path: src/screens/RegisterScreen/RegisterScreen.tsx
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import {
@@ -10,10 +11,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+// import Modal from 'react-native-modal'; // Убрали модальное окно
+
 import 'react-native-get-random-values';
 import type { RootStackParamList } from '../../navigation/types';
-
-// Firebase (через init)
 
 import {
   AppleAuthProvider,
@@ -28,22 +29,20 @@ import {
   setDoc,
 } from '@react-native-firebase/firestore';
 
-// Google Sign-In
 import {
   GoogleSignin,
   isCancelledResponse,
   isSuccessResponse,
 } from '@react-native-google-signin/google-signin';
 
-// Apple Sign-In
 import * as AppleAuthentication from 'expo-apple-authentication';
 
-// SHA-256
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils';
 
 import { auth, db } from 'services/firebase/init';
 import { styles } from './styles/RegisterScreen.styles';
+
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Register'>;
@@ -56,7 +55,11 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [code, setCode] = useState('');
   const [confirm, setConfirm] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
   const [loading, setLoading] = useState(false);
+  // const [showProfileModal, setShowProfileModal] = useState(false); // Убрали состояние модального окна
+
   const appleAvailable = useAppleAvailable();
+  console.log("UserProfileScreen mounted");
+  // console.log("showProfileModal:", showProfileModal); // Убрали лишний console.log
 
   const ensureUserDoc = async (user: FirebaseAuthTypes.User) => {
     try {
@@ -76,6 +79,11 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  const handlePostRegistration = async (user: FirebaseAuthTypes.User) => {
+    await ensureUserDoc(user);
+    navigation.navigate('UserProfile'); // Изменили вызов навигации
+  };
+
   const handleRegisterEmail = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Email and password are required');
@@ -84,8 +92,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     try {
       setLoading(true);
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      await ensureUserDoc(cred.user);
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      await handlePostRegistration(cred.user);
     } catch (e: any) {
       Alert.alert('Registration failed', e?.message ?? String(e));
     } finally {
@@ -119,8 +126,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     try {
       setLoading(true);
       const result = await confirm.confirm(code.trim());
-      await ensureUserDoc(result.user);
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      await handlePostRegistration(result.user);
     } catch (e: any) {
       Alert.alert('Invalid code', e?.message ?? String(e));
     } finally {
@@ -142,9 +148,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
       const credential = GoogleAuthProvider.credential(idToken);
       const { user } = await signInWithCredential(auth, credential);
-
-      await ensureUserDoc(user);
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      await handlePostRegistration(user);
     } catch (e: any) {
       const msg = e?.message || String(e);
       if (!/cancel/i.test(msg)) Alert.alert('Google Sign-In', msg);
@@ -176,8 +180,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       );
 
       const { user } = await signInWithCredential(auth, credential);
-      await ensureUserDoc(user);
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      await handlePostRegistration(user);
     } catch (e: any) {
       const msg = e?.message || String(e);
       if (!/canceled|cancelled/i.test(msg)) Alert.alert('Apple Sign-In', msg);
@@ -231,6 +234,8 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       <View style={{ marginTop: 16 }}>
         <Button title="Already have an account? Login" onPress={() => navigation.navigate('Login')} />
       </View>
+
+      {/* Убрали блок Modal */}
     </View>
   );
 };

@@ -1,18 +1,18 @@
 // path: src/screens/SettingsScreen/components/AvatarEditorModal.tsx
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { styles } from '../SettingsScreen.styles';
+import { styles } from '../../../../styles/SettingsScreen.styles';
 
 function isValidHttpUrl(str: string) {
   try {

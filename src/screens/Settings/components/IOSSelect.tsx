@@ -2,7 +2,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React from 'react';
 import { ActionSheetIOS, Text, TouchableOpacity } from 'react-native';
-import { styles } from '../SettingsScreen.styles';
+import { styles } from '../../../../styles/SettingsScreen.styles';
 
 type Props = {
   value: string;
