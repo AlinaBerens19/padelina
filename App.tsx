@@ -1,6 +1,8 @@
 // App.tsx
-import 'react-native-get-random-values'; // ← для uuid/crypto
-import './src/polyfills/networking'; // ← патч RN Networking (timeout/withCredentials)
+import 'expo-dev-client'; // опционально
+import 'react-native-gesture-handler'; // 👍 навбар/жесты (первым)
+import 'react-native-get-random-values'; // uuid/crypto
+import './src/polyfills/networking'; // патч RN Networking (timeout/withCredentials)
 
 import { getApp } from '@react-native-firebase/app';
 import React from 'react';
@@ -10,19 +12,16 @@ import SpinnerOverlay from './src/components/SpinnerOverlay';
 import { useAuth } from './src/hooks/useAuth';
 import AppNavigator from './src/navigation/AppNavigator';
 
-// ✅ конфиг Google Sign-In (использует EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID)
+// Google Sign-In конфиг (использует EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID)
 import { configureGoogleSignIn } from './src/services/firebase/auth';
 
 export default function App() {
   const { initializing, isAuthenticated } = useAuth();
 
   React.useEffect(() => {
-    // 1) Инициализация Google Sign-In
     configureGoogleSignIn();
-
-    // 2) (опционально) проверка, что Firebase App поднят
     try {
-      const app = getApp(); // [DEFAULT]
+      const app = getApp();
       console.log('✅ Firebase default app:', app.name);
     } catch (e) {
       console.warn('⚠️ Firebase app not initialized yet:', e);
