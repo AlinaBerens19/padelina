@@ -1,11 +1,12 @@
 // app.config.js
-// Динамический конфиг Expo: Firebase files через EAS file env.
+// Динамический конфиг Expo. Берём базу из app.json и ЖЁСТКО подставляем пути
+// к Firebase-файлам из EAS file env (без локальных fallback-ов).
 // iOS: GOOGLE_SERVICE_INFO_PLIST (type: file)
-// Android: GOOGLE_SERVICES_JSON (type: file) — опционально
+// Android: GOOGLE_SERVICES_JSON (type: file)
 // Плагины: RNFirebase, expo-build-properties (iOS static frameworks), Google Sign-In, Apple Auth.
 
 const base = require('./app.json');
-const expoCfg = base.expo || base; // <= НЕ "expo", чтобы не ловить ReferenceError
+const expoCfg = base.expo || base; // не используем "expo" напрямую
 
 function fixIosUrlSchemes(ios) {
   const reversedFromEnv = process.env.REVERSED_CLIENT_ID;
@@ -26,12 +27,13 @@ function fixIosUrlSchemes(ios) {
   if (reversedFromEnv) {
     infoPlist.CFBundleURLTypes = [{ CFBundleURLSchemes: [reversedFromEnv] }];
   } else if (hasPlaceholder || !alreadyHasReversed) {
-    // плагин @react-native-google-signin/google-signin подтянет схему из GoogleService-Info.plist
+    // Плагин @react-native-google-signin/google-signin подтянет схему из GoogleService-Info.plist
   }
 
   return { ...ios, infoPlist };
 }
 
+// Добавляем плагины без дублей
 function withPlugins(existing = []) {
   const plugins = [...existing];
   const add = (p) => {
@@ -49,13 +51,10 @@ function withPlugins(existing = []) {
 }
 
 module.exports = () => {
+  // iOS: только из ENV, без локальных fallback’ов
   const ios = {
     ...(expoCfg.ios || {}),
-    googleServicesFile:
-      process.env.GOOGLE_SERVICE_INFO_PLIST ||
-      (expoCfg.ios ? expoCfg.ios.googleServicesFile : undefined),
-
-    // bundle id можно задать через env
+    googleServicesFile: process.env.GOOGLE_SERVICE_INFO_PLIST, // ⬅️ ТОЛЬКО ENV
     bundleIdentifier:
       process.env.IOS_BUNDLE_ID ||
       (expoCfg.ios && expoCfg.ios.bundleIdentifier) ||
@@ -63,13 +62,10 @@ module.exports = () => {
   };
   const iosFixed = fixIosUrlSchemes(ios);
 
+  // Android: только из ENV, без локальных fallback’ов
   const android = {
     ...(expoCfg.android || {}),
-    googleServicesFile:
-      process.env.GOOGLE_SERVICES_JSON ||
-      (expoCfg.android ? expoCfg.android.googleServicesFile : undefined),
-
-    // application id (Android package)
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON, // ⬅️ ТОЛЬКО ENV
     package:
       process.env.ANDROID_APPLICATION_ID ||
       (expoCfg.android && expoCfg.android.package) ||
@@ -77,7 +73,7 @@ module.exports = () => {
   };
 
   return {
-    // возвращаем базовые поля из app.json
+    // Базовые поля из app.json
     ...expoCfg,
     ios: { ...iosFixed, usesAppleSignIn: true },
     android,
@@ -86,7 +82,6 @@ module.exports = () => {
       GOOGLE_PLACES_KEY:
         process.env.GOOGLE_PLACES_KEY ??
         (expoCfg.extra && expoCfg.extra.GOOGLE_PLACES_KEY),
-
       EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID:
         process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
         (expoCfg.extra && expoCfg.extra.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID),

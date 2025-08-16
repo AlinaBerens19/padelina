@@ -16,8 +16,11 @@ import {
 import type { RootStackParamList } from '../../navigation/types';
 
 // Firebase Auth (RNFirebase)
-import authRN, { FirebaseAuthTypes } from '@react-native-firebase/auth';
-// Firestore (RNFirebase)
+import authRN, {
+  AppleAuthProvider,
+  FirebaseAuthTypes,
+  GoogleAuthProvider,
+} from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 
 // Google Sign-In
@@ -41,41 +44,27 @@ type Props = {
 };
 
 const RegisterScreen: React.FC<Props> = ({ navigation }) => {
-  // email/password
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
-  // phone
-  const [phone, setPhone] = useState(''); // +9725...
+  const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
-  const [confirm, setConfirm] =
-    useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
-
-  // ui
+  const [confirm, setConfirm] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
   const [loading, setLoading] = useState(false);
   const appleAvailable = useAppleAvailable();
 
-  // ===== helpers =====
   const ensureUserDoc = async (user: FirebaseAuthTypes.User) => {
     try {
-      await firestore()
-        .collection('users')
-        .doc(user.uid)
-        .set(
-          {
-            id: user.uid,
-            email: user.email ?? null,
-            name: user.displayName ?? '',
-            phone: user.phoneNumber ?? null,
-          },
-          { merge: true }
-        );
+      await firestore().collection('users').doc(user.uid).set({
+        id: user.uid,
+        email: user.email ?? null,
+        name: user.displayName ?? '',
+        phone: user.phoneNumber ?? null,
+      }, { merge: true });
     } catch (e) {
       console.warn('ensureUserDoc error', e);
     }
   };
 
-  // ===== email/password =====
   const handleRegisterEmail = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Email and password are required');
@@ -83,10 +72,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
     try {
       setLoading(true);
-      const cred = await authRN().createUserWithEmailAndPassword(
-        email.trim(),
-        password
-      );
+      const cred = await authRN().createUserWithEmailAndPassword(email.trim(), password);
       await ensureUserDoc(cred.user);
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (e: any) {
@@ -96,7 +82,6 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // ===== phone =====
   const sendPhoneCode = async () => {
     const phoneE164 = phone.trim();
     if (!phoneE164.startsWith('+')) {
@@ -132,11 +117,9 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // ===== Google (через getTokens) =====
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
-
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
       const response = await GoogleSignin.signIn();
@@ -146,8 +129,8 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       const { idToken } = await GoogleSignin.getTokens();
       if (!idToken) throw new Error('No Google idToken');
 
-      const googleCredential = authRN.GoogleAuthProvider.credential(idToken);
-      const { user } = await authRN().signInWithCredential(googleCredential);
+      const credential = GoogleAuthProvider.credential(idToken);
+      const { user } = await authRN().signInWithCredential(credential);
 
       await ensureUserDoc(user);
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
@@ -159,25 +142,24 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // ===== Apple (iOS) без expo-crypto =====
   const signInWithApple = async () => {
     try {
       setLoading(true);
 
-      const rawNonce = getSecureRandomHex(16); // синхронно
-      const hashedNonce = sha256Hex(rawNonce); // SHA-256 hex
+      const rawNonce = getSecureRandomHex(16);
+      const hashedNonce = sha256Hex(rawNonce);
 
       const apple = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
         nonce: hashedNonce,
       });
 
       if (!apple.identityToken) throw new Error('No identityToken from Apple');
 
-      const credential = authRN.AppleAuthProvider.credential(
+      const credential = AppleAuthProvider.credential(
         apple.identityToken,
         rawNonce
       );
@@ -197,47 +179,18 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.container}>
       <Text style={styles.title}>Create account</Text>
 
-      {/* email/пароль */}
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        inputMode="email"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+      <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" inputMode="email" />
+      <TextInput style={styles.input} placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
       <TouchableOpacity style={styles.primaryBtn} onPress={handleRegisterEmail} disabled={loading}>
         {loading ? <ActivityIndicator /> : <Text style={styles.primaryText}>Create with Email</Text>}
       </TouchableOpacity>
 
-      {/* разделитель */}
       <Text style={styles.sep}>OR</Text>
 
-      {/* телефон */}
-      <TextInput
-        style={styles.input}
-        placeholder="Phone (+9725...)"
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-      />
+      <TextInput style={styles.input} placeholder="Phone (+9725...)" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
       {confirm ? (
         <>
-          <TextInput
-            style={styles.input}
-            placeholder="SMS Code"
-            value={code}
-            onChangeText={setCode}
-            keyboardType="number-pad"
-          />
+          <TextInput style={styles.input} placeholder="SMS Code" value={code} onChangeText={setCode} keyboardType="number-pad" />
           <TouchableOpacity style={styles.primaryBtn} onPress={confirmPhoneCode} disabled={loading}>
             {loading ? <ActivityIndicator /> : <Text style={styles.primaryText}>Confirm Code</Text>}
           </TouchableOpacity>
@@ -248,15 +201,12 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
       )}
 
-      {/* разделитель */}
       <Text style={styles.sep}>OR</Text>
 
-      {/* Google */}
       <TouchableOpacity style={styles.googleBtn} onPress={signInWithGoogle} disabled={loading}>
         <Text style={styles.googleText}>Continue with Google</Text>
       </TouchableOpacity>
 
-      {/* Apple — только iOS, и только если доступно */}
       {appleAvailable && (
         <AppleAuthentication.AppleAuthenticationButton
           buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
@@ -274,7 +224,6 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-/** Проверяем доступность AppleAuth (iOS реальные устройства/симулятор с iOS13+) */
 function useAppleAvailable() {
   const [available, setAvailable] = useState(false);
   useEffect(() => {
@@ -295,15 +244,13 @@ function useAppleAvailable() {
   return available;
 }
 
-/** Случайный HEX без expo-random (использует polyfill getRandomValues) */
 function getSecureRandomHex(lenBytes = 16): string {
   const bytes = new Uint8Array(lenBytes);
-  // @ts-ignore - polyfill добавляет global.crypto
+  // @ts-ignore
   crypto.getRandomValues(bytes);
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** SHA-256 в hex (без expo-crypto) */
 function sha256Hex(s: string): string {
   return bytesToHex(sha256(utf8ToBytes(s)));
 }
