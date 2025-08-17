@@ -1,9 +1,10 @@
 // path: src/screens/RegisterScreen/RegisterScreen.tsx
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Formik } from 'formik';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  Animated,
   Button,
   Platform,
   Text,
@@ -11,11 +12,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-// import Modal from 'react-native-modal'; // Убрали модальное окно
+import * as Yup from 'yup';
 
-import 'react-native-get-random-values';
-import type { RootStackParamList } from '../../navigation/types';
-
+import { sha256 } from '@noble/hashes/sha2';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils';
 import {
   AppleAuthProvider,
   createUserWithEmailAndPassword,
@@ -24,42 +24,42 @@ import {
   signInWithCredential,
   signInWithPhoneNumber,
 } from '@react-native-firebase/auth';
-import {
-  doc,
-  setDoc,
-} from '@react-native-firebase/firestore';
-
+import { doc, setDoc } from '@react-native-firebase/firestore';
 import {
   GoogleSignin,
   isCancelledResponse,
   isSuccessResponse,
 } from '@react-native-google-signin/google-signin';
-
+import LoadingButton from 'components/LoadingButton';
 import * as AppleAuthentication from 'expo-apple-authentication';
-
-import { sha256 } from '@noble/hashes/sha2';
-import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils';
+import 'react-native-get-random-values';
+import type { RootStackParamList } from '../../navigation/types';
 
 import { auth, db } from 'services/firebase/init';
 import { styles } from './styles/RegisterScreen.styles';
 
+const RegisterSchema = Yup.object().shape({
+  email: Yup.string().email('Invalid email address').required('Email is required'),
+  password: Yup.string().min(6, 'Password too short').required('Password is required'),
+});
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Register'>;
 };
 
 const RegisterScreen: React.FC<Props> = ({ navigation }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [confirm, setConfirm] = useState<FirebaseAuthTypes.ConfirmationResult | null>(null);
   const [loading, setLoading] = useState(false);
-  // const [showProfileModal, setShowProfileModal] = useState(false); // Убрали состояние модального окна
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [emailErrorAnim] = useState(new Animated.Value(0));
 
   const appleAvailable = useAppleAvailable();
-  console.log("UserProfileScreen mounted");
-  // console.log("showProfileModal:", showProfileModal); // Убрали лишний console.log
+
+  const showError = (title: string, message?: string) => {
+    Alert.alert(title, message ?? 'Some error occurred');
+  };
 
   const ensureUserDoc = async (user: FirebaseAuthTypes.User) => {
     try {
@@ -81,20 +81,17 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
   const handlePostRegistration = async (user: FirebaseAuthTypes.User) => {
     await ensureUserDoc(user);
-    navigation.navigate('UserProfile'); // Изменили вызов навигации
+    navigation.navigate('UserProfile', { userId: user.uid });
   };
 
-  const handleRegisterEmail = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Email and password are required');
-      return;
-    }
+
+  const handleRegisterEmail = async (email: string, password: string) => {
     try {
       setLoading(true);
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await handlePostRegistration(cred.user);
     } catch (e: any) {
-      Alert.alert('Registration failed', e?.message ?? String(e));
+      showError('Registration Error', e?.message ?? String(e));
     } finally {
       setLoading(false);
     }
@@ -102,17 +99,17 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
   const sendPhoneCode = async () => {
     const phoneE164 = phone.trim();
-    if (!phoneE164.startsWith('+')) {
-      Alert.alert('Phone', 'Введите номер в международном формате, например +9725...');
+    if (!/^\+\d{9,15}$/.test(phoneE164)) {
+      showError('Invalid Phone', 'Enter phone number in international format (e.g. +9725...)');
       return;
     }
     try {
       setLoading(true);
       const confirmation = await signInWithPhoneNumber(auth, phoneE164);
       setConfirm(confirmation);
-      Alert.alert('SMS sent', 'Введите код из SMS');
+      showError('Phone code sent', 'Please check your SMS for the verification code');
     } catch (e: any) {
-      Alert.alert('Phone auth', e?.message ?? String(e));
+      showError('Phone Verification Error', e?.message ?? String(e));
     } finally {
       setLoading(false);
     }
@@ -120,7 +117,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
   const confirmPhoneCode = async () => {
     if (!confirm || !code.trim()) {
-      Alert.alert('Phone', 'Сначала запросите код и введите его');
+      showError('Error', 'Please send the code first or enter a valid code');
       return;
     }
     try {
@@ -128,7 +125,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       const result = await confirm.confirm(code.trim());
       await handlePostRegistration(result.user);
     } catch (e: any) {
-      Alert.alert('Invalid code', e?.message ?? String(e));
+      showError('Code Confirmation Error', e?.message ?? String(e));
     } finally {
       setLoading(false);
     }
@@ -151,7 +148,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       await handlePostRegistration(user);
     } catch (e: any) {
       const msg = e?.message || String(e);
-      if (!/cancel/i.test(msg)) Alert.alert('Google Sign-In', msg);
+      if (!/cancel/i.test(msg)) showError('Google Sign-In', msg);
     } finally {
       setLoading(false);
     }
@@ -183,7 +180,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       await handlePostRegistration(user);
     } catch (e: any) {
       const msg = e?.message || String(e);
-      if (!/canceled|cancelled/i.test(msg)) Alert.alert('Apple Sign-In', msg);
+      if (!/canceled|cancelled/i.test(msg)) showError('Apple Sign-In', msg);
     } finally {
       setLoading(false);
     }
@@ -193,11 +190,62 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.container}>
       <Text style={styles.title}>Create account</Text>
 
-      <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" inputMode="email" />
-      <TextInput style={styles.input} placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
-      <TouchableOpacity style={styles.primaryBtn} onPress={handleRegisterEmail} disabled={loading}>
-        {loading ? <ActivityIndicator /> : <Text style={styles.primaryText}>Create with Email</Text>}
-      </TouchableOpacity>
+      <Formik
+        initialValues={{ email: '', password: '' }}
+        validationSchema={RegisterSchema}
+        onSubmit={({ email, password }) => handleRegisterEmail(email, password)}
+      >
+        {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              value={values.email}
+              onChangeText={(text) => {
+                handleChange('email')(text);
+                Animated.timing(emailErrorAnim, {
+                  toValue: errors.email && touched.email ? 1 : 0,
+                  duration: 200,
+                  useNativeDriver: false,
+                }).start();
+              }}
+              onBlur={handleBlur('email')}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+            <Animated.View style={{ height: emailErrorAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }) }}>
+              {touched.email && errors.email && (
+                <Text style={{ color: 'red', fontSize: 12 }}>{errors.email}</Text>
+              )}
+            </Animated.View>
+
+            <View>
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                secureTextEntry={!passwordVisible}
+                value={values.password}
+                onChangeText={handleChange('password')}
+                onBlur={handleBlur('password')}
+              />
+              <TouchableOpacity onPress={() => setPasswordVisible((v) => !v)}>
+                <Text style={{ color: 'blue', textAlign: 'right', marginRight: 8 }}>
+                  {passwordVisible ? 'Hide' : 'Show'} Password
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {touched.password && errors.password && <Text style={{ color: 'red' }}>{errors.password}</Text>}
+
+            <LoadingButton
+              title="Create with Email"
+              loading={loading}
+              onPress={handleSubmit as () => void}
+              style={styles.primaryBtn}
+              textStyle={styles.primaryText}
+            />
+          </>
+        )}
+      </Formik>
 
       <Text style={styles.sep}>OR</Text>
 
@@ -205,21 +253,33 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       {confirm ? (
         <>
           <TextInput style={styles.input} placeholder="SMS Code" value={code} onChangeText={setCode} keyboardType="number-pad" />
-          <TouchableOpacity style={styles.primaryBtn} onPress={confirmPhoneCode} disabled={loading}>
-            {loading ? <ActivityIndicator /> : <Text style={styles.primaryText}>Confirm Code</Text>}
-          </TouchableOpacity>
+          <LoadingButton
+            title="Confirm Code"
+            loading={loading}
+            onPress={confirmPhoneCode}
+            style={styles.primaryBtn}
+            textStyle={styles.primaryText}
+          />
         </>
       ) : (
-        <TouchableOpacity style={styles.secondaryBtn} onPress={sendPhoneCode} disabled={loading}>
-          {loading ? <ActivityIndicator /> : <Text style={styles.secondaryText}>Send SMS Code</Text>}
-        </TouchableOpacity>
+        <LoadingButton
+          title="Send SMS Code"
+          loading={loading}
+          onPress={sendPhoneCode}
+          style={styles.secondaryBtn}
+          textStyle={styles.secondaryText}
+        />
       )}
 
       <Text style={styles.sep}>OR</Text>
 
-      <TouchableOpacity style={styles.googleBtn} onPress={signInWithGoogle} disabled={loading}>
-        <Text style={styles.googleText}>Continue with Google</Text>
-      </TouchableOpacity>
+      <LoadingButton
+        title="Continue with Google"
+        loading={loading}
+        onPress={signInWithGoogle}
+        style={styles.googleBtn}
+        textStyle={styles.googleText}
+      />
 
       {appleAvailable && (
         <AppleAuthentication.AppleAuthenticationButton
@@ -234,8 +294,6 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       <View style={{ marginTop: 16 }}>
         <Button title="Already have an account? Login" onPress={() => navigation.navigate('Login')} />
       </View>
-
-      {/* Убрали блок Modal */}
     </View>
   );
 };

@@ -1,36 +1,42 @@
 // src/navigation/AppNavigator.tsx
+import auth from '@react-native-firebase/auth';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
-// экраны Auth
+import EmailVerificationScreen from '../screens/Auth/EmailVerificationScreen';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import RegisterScreen from '../screens/Auth/RegisterScreen';
-
-// экраны Main
-import SettingsScreen from '../screens/Settings/SettingsScreen';
-import BottomTabs from './BottomTabs';
-
-import UserLevelScreen from 'screens/User/UserLevelScreen';
-import UserProfileScreen from 'screens/User/UserProfileScreen';
+import MainStackNavigator from './MainStackNavigator';
 import { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-type Props = {
-  isAuthenticated: boolean;
-};
+export default function AppNavigator() {
+  const [user, setUser] = useState(auth().currentUser);
+  const [initializing, setInitializing] = useState(true);
 
-export default function AppNavigator({ isAuthenticated }: Props) {
+  useEffect(() => {
+    const subscriber = auth().onAuthStateChanged(userState => {
+      setUser(userState);
+      if (initializing) {
+        setInitializing(false);
+      }
+    });
+    return subscriber;
+  }, [initializing]);
+
+  if (initializing) {
+    return null;
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {isAuthenticated ? (
+        {user ? (
           <>
-            <Stack.Screen name="Home" component={BottomTabs} />
-            <Stack.Screen name="Settings" component={SettingsScreen} />
-            <Stack.Screen name="UserProfile" component={UserProfileScreen} />
-            <Stack.Screen name="UserLevel" component={UserLevelScreen} />
+            <Stack.Screen name="Main" component={MainStackNavigator} />
+            <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
           </>
         ) : (
           <>
