@@ -1,4 +1,4 @@
-// path: src/screens/SettingsScreen/SettingsScreen.tsx
+// C:\Users\Alina\Desktop\PadelinaClean\padelina\src\screens\User\UserProfileScreen.tsx
 import {
   doc,
   getDoc,
@@ -6,7 +6,9 @@ import {
   setDoc,
 } from '@react-native-firebase/firestore';
 import { Picker } from '@react-native-picker/picker';
+import { CommonActions } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MainStackParamList } from 'navigation/MainStackNavigator';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -23,12 +25,11 @@ import { PlacePickerModal } from 'screens/Settings/components/PlacePickerModal';
 import { Coords, SPORTS } from 'screens/Settings/constants';
 import { styles } from '../../../styles/SettingsScreen.styles';
 import { useAuth } from '../../hooks/useAuth';
-import { RootStackParamList } from '../../navigation/types';
 import { db } from '../../services/firebase/db';
 import { useSpinnerStore } from '../../store/spinnerStore';
 
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'UserProfile'>;
+  navigation: NativeStackNavigationProp<MainStackParamList, 'UserProfile'>;
 };
 
 const UserProfileScreen: React.FC<Props> = ({ navigation }) => {
@@ -50,7 +51,28 @@ const UserProfileScreen: React.FC<Props> = ({ navigation }) => {
   const [addressCoords, setAddressCoords] = useState<Coords | null>(null);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    // ✅ Добавляем проверку здесь
+    if (!user) {
+      // Если пользователь не существует, перенаправляем на экран 'Login'
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        })
+      );
+      return;
+    }
+    
+    // Если user существует, но у него нет uid, также перенаправляем
+    if (!user?.uid) {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        })
+      );
+      return;
+    }
 
     const load = async () => {
       try {
@@ -97,8 +119,9 @@ const UserProfileScreen: React.FC<Props> = ({ navigation }) => {
     };
 
     load();
-  }, [user?.uid, user?.displayName, user?.photoURL]);
+  }, [user?.uid, user?.displayName, user?.photoURL, navigation]); // ✅ Добавлено `navigation` в зависимости
 
+  // ... (остальной код handleSave и рендера)
   const handleSave = async () => {
     try {
       spinner.show('Saving...');
@@ -138,8 +161,14 @@ const UserProfileScreen: React.FC<Props> = ({ navigation }) => {
       await setDoc(userRef, payload, { merge: true });
 
       Alert.alert('Saved', 'Your changes have been saved.');
-      // Исправленный вызов навигации с передачей параметра
-      navigation.navigate('UserLevel', { userId: user.uid });
+
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        })
+      );
+
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not save profile.');
     } finally {
@@ -150,14 +179,6 @@ const UserProfileScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-
-
-        {/* <View style={[styles.avatar, styles.avatarFallback]}>
-          <Text style={styles.avatarFallbackText}>
-            {(name || user?.displayName || '?').trim().charAt(0).toUpperCase() || '?'}
-          </Text>
-        </View> */}
-
         {/* Name */}
         <Text style={styles.label}>Full Name *</Text>
         <TextInput

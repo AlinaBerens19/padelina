@@ -1,4 +1,3 @@
-// path: src/screens/RegisterScreen/RegisterScreen.tsx
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Formik } from 'formik';
 import React, { useEffect, useState } from 'react';
@@ -33,9 +32,10 @@ import {
 import LoadingButton from 'components/LoadingButton';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import 'react-native-get-random-values';
-import type { RootStackParamList } from '../../navigation/types';
 
 import { auth, db } from 'services/firebase/init';
+import { navigationRef } from '../../navigation/navigationRef';
+import type { RootStackParamList } from '../../navigation/types';
 import { styles } from './styles/RegisterScreen.styles';
 
 const RegisterSchema = Yup.object().shape({
@@ -81,9 +81,21 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
   const handlePostRegistration = async (user: FirebaseAuthTypes.User) => {
     await ensureUserDoc(user);
-    navigation.navigate('UserProfile', { userId: user.uid });
-  };
 
+    navigationRef.reset({
+      index: 0,
+      routes: [{ name: 'Main' }],
+    });
+
+    setTimeout(() => {
+      if (navigationRef.isReady()) {
+        navigationRef.navigate('Main', {
+          screen: 'UserProfile',
+          params: { userId: user.uid },
+        });
+      }
+    }, 0);
+  };
 
   const handleRegisterEmail = async (email: string, password: string) => {
     try {

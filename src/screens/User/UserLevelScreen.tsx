@@ -1,11 +1,19 @@
-import React from 'react'
+// UserLevelScreen.tsx
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
-const UserLevelScreen = () => {
+export default function UserLevelScreen() {
   return (
-    <div>
-      
-    </div>
-  )
+    <View style={styles.container}>
+      <Text style={styles.title}>User level</Text>
+      <Text style={styles.value}>42</Text>
+    </View>
+  );
 }
 
-export default UserLevelScreen
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 16 },
+  title: { fontSize: 20, fontWeight: '600', marginBottom: 8 },
+  value: { fontSize: 32, fontWeight: '700' },
+});
+

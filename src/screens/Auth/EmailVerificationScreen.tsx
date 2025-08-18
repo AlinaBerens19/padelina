@@ -1,9 +1,11 @@
 // src/screens/Auth/EmailVerificationScreen.tsx
-import auth from '@react-native-firebase/auth';
+import { getAuth, reload, sendEmailVerification, signOut } from '@react-native-firebase/auth';
+import { CommonActions, } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import LoadingButton from 'components/LoadingButton';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../../hooks/useAuth';
 import { RootStackParamList } from '../../navigation/types';
 import { styles } from './styles/EmailVerificationScreen.styles';
 
@@ -11,33 +13,51 @@ type EmailVerificationScreenProps = NativeStackScreenProps<RootStackParamList, '
 
 const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
-  const [emailVerified, setEmailVerified] = useState(false);
+  const { user } = useAuth();
 
   const checkVerification = async () => {
     try {
       setLoading(true);
-      await auth().currentUser?.reload();
-      const user = auth().currentUser;
-      const verified = user?.emailVerified ?? false;
-      setEmailVerified(verified);
-      if (verified) {
-        navigation.reset({
-          index: 0,
-          routes: [
-            {
-              name: 'Main',
-              params: {
-                screen: 'UserProfile',
-                params: {
-                  userId: user?.uid,
+      const authInstance = getAuth();
+
+      if (!user) {
+        Alert.alert('Error', 'User not found. Please sign in again.');
+        return;
+      }
+
+      await reload(user);
+      const updatedUser = authInstance.currentUser;
+      const verified = updatedUser?.emailVerified ?? false;
+
+      if (
+        verified 
+        && 
+        updatedUser?.uid
+      ) {
+        // ✅ Правильный reset с вложенным state для Main (nested navigator)
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [
+              {
+                name: 'Main',
+                state: {
+                  index: 0,
+                  routes: [
+                    {
+                      name: 'UserProfile',
+                      params: { userId: updatedUser.uid },
+                    },
+                  ],
                 },
               },
-            },
-          ],
-        });
-      } else {
-        Alert.alert('Not Verified', 'Email is still not verified.');
+            ],
+          })
+        );
+        return;
       }
+
+      Alert.alert('Not Verified', 'Email is still not verified.');
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Something went wrong');
     } finally {
@@ -48,8 +68,14 @@ const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({ navig
   const resendEmail = async () => {
     try {
       setLoading(true);
-      await auth().currentUser?.sendEmailVerification();
-      Alert.alert('Sent', 'Verification email resent.');
+      const authInstance = getAuth();
+      const currentUser = authInstance.currentUser;
+      if (currentUser) {
+        await sendEmailVerification(currentUser);
+        Alert.alert('Sent', 'Verification email resent.');
+      } else {
+        Alert.alert('Error', 'User not found. Please sign in again.');
+      }
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to send verification email');
     } finally {
@@ -60,37 +86,14 @@ const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({ navig
   const handleSignOut = async () => {
     try {
       setLoading(true);
-      await auth().signOut();
+      const authInstance = getAuth();
+      await signOut(authInstance);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to sign out.');
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    const unsubscribe = auth().onAuthStateChanged(async (user) => {
-      if (user?.emailVerified) {
-        if (user?.uid) {
-          navigation.reset({
-            index: 0,
-            routes: [
-              {
-                name: 'Main',
-                params: {
-                  screen: 'UserProfile',
-                  params: {
-                    userId: user.uid,
-                  },
-                },
-              },
-            ],
-          });
-        }
-      }
-    });
-    return unsubscribe;
-  }, [navigation]);
 
   return (
     <View style={styles.container}>

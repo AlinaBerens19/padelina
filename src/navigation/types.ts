@@ -1,33 +1,15 @@
-import { MainStackParamList } from "./MainStackNavigator";
+import { NavigatorScreenParams } from '@react-navigation/native';
 
-export type RootStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  Home: undefined;
-  CreateMatch: undefined;
-  Chat: undefined;
-  Profile: undefined;
-  Search: undefined;
-  Settings: undefined;
+// Типы для MainStackNavigator
+export type MainStackParamList = {
   UserProfile: { userId: string };
-  UserLevel: { userId: string };
-  EmailVerification: undefined;
-  // 'Main' теперь может принимать параметры, чтобы указать, на какой экран
-  // внутри него нужно перейти, и какие параметры ему передать.
-  Main: {
-    screen: keyof MainStackParamList;
-    params?: {
-      userId?: string;
-    };
-  } | undefined;
+  // Добавьте другие экраны, если они есть в MainStackNavigator
 };
 
-// Чтобы использовать тип Main, нам нужно знать, какие экраны есть в MainStack.
-// Создайте этот тип, если он еще не существует.
-// src/navigation/MainStackNavigator.tsx
-// export type MainStackParamList = {
-//   Home: undefined;
-//   Settings: undefined;
-//   UserProfile: { userId: string };
-//   UserLevel: { userId: string };
-// };
+// Типы для корневого навигатора AppNavigator
+export type RootStackParamList = {
+  Main: NavigatorScreenParams<MainStackParamList>; // ✅ Это говорит, что Main — это навигатор, и мы можем навигировать на его экраны
+  EmailVerification: undefined;
+  Login: undefined;
+  Register: undefined;
+};
