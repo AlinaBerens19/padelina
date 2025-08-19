@@ -141,7 +141,10 @@ const ProfileScreen = () => {
             <Text style={styles.location}>{email}</Text>
             <TouchableOpacity
               style={styles.settingsButton}
-              onPress={() => navigation.navigate('Settings')}
+              onPress={() => navigation.navigate('Main', {
+                          screen: 'Settings',
+                        })}
+
             >
               <Ionicons name="settings-outline" size={22} color="#666" />
             </TouchableOpacity>

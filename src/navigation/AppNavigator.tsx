@@ -1,4 +1,5 @@
 // src/navigation/AppNavigator.tsx
+
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React, { useEffect } from 'react';
@@ -12,38 +13,47 @@ import RegisterScreen from '../screens/Auth/RegisterScreen';
 import MainStackNavigator from './MainStackNavigator';
 import { RootStackParamList } from './types';
 
+import auth from '@react-native-firebase/auth';
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
   const { user, initializing } = useAuth();
 
   useEffect(() => {
-    if (initializing) return;
-
-    if (!user) {
+    if (!initializing && user) {
+      verifyUser();
+    } else if (!initializing && !user) {
       navigationRef.current?.reset({ index: 0, routes: [{ name: 'Login' }] });
-      return;
     }
+  }, [initializing, user?.uid]);
 
-    // ✅ Более явная и безопасная проверка
-    if (user.emailVerified === true) {
-      navigationRef.current?.reset({
-        index: 0,
-        routes: [
-          {
-            name: 'Main',
-            state: {
-              index: 0,
-              routes: [{ name: 'UserProfile', params: { userId: user.uid } }],
+  const verifyUser = async () => {
+    try {
+      await auth().currentUser?.reload(); // 🔄 Получаем актуальные данные о пользователе
+      const refreshedUser = auth().currentUser;
+
+      if (refreshedUser?.emailVerified) {
+        navigationRef.current?.reset({
+          index: 0,
+          routes: [
+            {
+              name: 'Main',
+              state: {
+                index: 0,
+                routes: [{ name: 'UserProfile', params: { userId: refreshedUser.uid } }],
+              },
             },
-          },
-        ],
-      });
-    } else {
-      // ✅ Если user.emailVerified === false или undefined
-      navigationRef.current?.reset({ index: 0, routes: [{ name: 'EmailVerification' }] });
+          ],
+        });
+      } else {
+        navigationRef.current?.reset({ index: 0, routes: [{ name: 'EmailVerification' }] });
+      }
+    } catch (e) {
+      console.warn('Error verifying user', e);
+      navigationRef.current?.reset({ index: 0, routes: [{ name: 'Login' }] });
     }
-  }, [initializing, user?.uid, user?.emailVerified]);
+  };
 
   if (initializing) {
     return (

@@ -160,7 +160,7 @@ const UserProfileScreen: React.FC<Props> = ({ navigation }) => {
       const userRef = doc(db, 'users', user.uid);
       await setDoc(userRef, payload, { merge: true });
 
-      Alert.alert('Saved', 'Your changes have been saved.');
+      // Alert.alert('Saved', 'Your changes have been saved.');
 
       navigation.dispatch(
         CommonActions.reset({
