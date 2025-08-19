@@ -2,8 +2,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import SettingsScreen from '../screens/Settings/SettingsScreen';
-import UserLevelScreen from '../screens/User/UserLevelScreen';
-import UserProfileScreen from '../screens/User/UserProfileScreen';
 import BottomTabs from './BottomTabs';
 
 // Типы маршрутов для MainStackNavigator
@@ -21,8 +19,7 @@ export default function MainStackNavigator() {
     <MainStack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Home">
       <MainStack.Screen name="Home" component={BottomTabs} />
       <MainStack.Screen name="Settings" component={SettingsScreen} />
-      <MainStack.Screen name="UserProfile" component={UserProfileScreen} />
-      <MainStack.Screen name="UserLevel" component={UserLevelScreen} />
+      <MainStack.Screen name="UserProfile" component={SettingsScreen} />
     </MainStack.Navigator>
   );
 }

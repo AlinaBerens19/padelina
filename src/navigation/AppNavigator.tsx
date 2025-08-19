@@ -41,7 +41,7 @@ export default function AppNavigator() {
               name: 'Main',
               state: {
                 index: 0,
-                routes: [{ name: 'UserProfile', params: { userId: refreshedUser.uid } }],
+                routes: [{ name: 'BottomTabs', params: { userId: refreshedUser.uid } }],
               },
             },
           ],

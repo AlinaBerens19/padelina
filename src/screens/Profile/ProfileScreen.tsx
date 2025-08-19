@@ -63,7 +63,7 @@ const ProfileScreen = () => {
       },
       err => {
         console.error('Firestore profile error:', err);
-        Alert.alert('Ошибка', 'Не удалось загрузить профиль пользователя.');
+        Alert.alert('Error', 'Failed to load user profile.');
         setLoading(false);
       }
     );

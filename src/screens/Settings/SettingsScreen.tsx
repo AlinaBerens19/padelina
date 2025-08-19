@@ -1,3 +1,5 @@
+// path: src/screens/Settings/SettingsScreen.tsx
+
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {
   doc,
@@ -7,7 +9,7 @@ import {
 } from '@react-native-firebase/firestore';
 import storage from '@react-native-firebase/storage';
 import { Picker } from '@react-native-picker/picker';
-import * as ImagePicker from 'expo-image-picker'; // ✅ Импорт в самом начале файла.
+import * as ImagePicker from 'expo-image-picker';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -24,7 +26,6 @@ import { styles } from '../../../styles/SettingsScreen.styles';
 import { useAuth } from '../../hooks/useAuth';
 import { db } from '../../services/firebase/db';
 import { useSpinnerStore } from '../../store/spinnerStore';
-import { AvatarEditorModal } from './components/AvatarEditorModal';
 import { IOSSelect } from './components/IOSSelect';
 import { PlacePickerModal } from './components/PlacePickerModal';
 import { Coords, LEVELS, SPORTS } from './constants';
@@ -42,7 +43,6 @@ const SettingsScreen = () => {
 
   const [avatar, setAvatar] = useState(user?.photoURL || '');
   const [imageOk, setImageOk] = useState(true);
-  const [editingAvatar, setEditingAvatar] = useState(false);
 
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [showAddressPicker, setShowAddressPicker] = useState(false);
@@ -59,26 +59,51 @@ const SettingsScreen = () => {
         const snap = await getDoc(userRef);
         const data = (snap.exists() ? snap.data() : {}) as Record<string, any>;
 
-        setName(typeof data.name === 'string' && data.name.trim() ? data.name : user.displayName || '');
+        setName(
+          typeof data.name === 'string' && data.name.trim()
+            ? data.name
+            : user.displayName || ''
+        );
+
         setLocation(typeof data.location === 'string' ? data.location : '');
         const locLat = typeof data.locationLat === 'number' ? data.locationLat : undefined;
         const locLng = typeof data.locationLng === 'number' ? data.locationLng : undefined;
-        setLocationCoords(typeof locLat === 'number' && typeof locLng === 'number' ? { lat: locLat, lng: locLng } : null);
+        setLocationCoords(
+          typeof locLat === 'number' && typeof locLng === 'number'
+            ? { lat: locLat, lng: locLng }
+            : null
+        );
 
         setAddress(typeof data.address === 'string' ? data.address : '');
         const addrLat = typeof data.addressLat === 'number' ? data.addressLat : undefined;
         const addrLng = typeof data.addressLng === 'number' ? data.addressLng : undefined;
-        setAddressCoords(typeof addrLat === 'number' && typeof addrLng === 'number' ? { lat: addrLat, lng: addrLng } : null);
+        setAddressCoords(
+          typeof addrLat === 'number' && typeof addrLng === 'number'
+            ? { lat: addrLat, lng: addrLng }
+            : null
+        );
 
-        const lvlStr = typeof data.level === 'number' ? String(data.level) : typeof data.level === 'string' ? data.level : '';
+        const lvlStr =
+          typeof data.level === 'number'
+            ? String(data.level)
+            : typeof data.level === 'string'
+            ? data.level
+            : '';
         setLevel(LEVELS.includes(lvlStr as any) ? lvlStr : '');
 
         const sportStr = typeof data.favouriteSport === 'string' ? data.favouriteSport : '';
         setFavouriteSport(SPORTS.includes(sportStr as any) ? sportStr : '');
 
-        setPhone(typeof data.phone === 'string' ? data.phone.replace(/\D/g, '').slice(0, 10) : '');
+        setPhone(
+          typeof data.phone === 'string'
+            ? data.phone.replace(/\D/g, '').slice(0, 10)
+            : ''
+        );
 
-        const avatarUrl = typeof data.avatar === 'string' && data.avatar.trim() ? data.avatar.trim() : user.photoURL || '';
+        const avatarUrl =
+          typeof data.avatar === 'string' && data.avatar.trim()
+            ? data.avatar.trim()
+            : user.photoURL || '';
         setAvatar(avatarUrl);
         setImageOk(true);
       } catch (e: any) {
@@ -146,44 +171,80 @@ const SettingsScreen = () => {
     }
   };
 
+  /** Определение contentType по расширению */
+  const mimeFromExt = (ext: string) => {
+    const e = ext.toLowerCase();
+    if (['jpg', 'jpeg', 'jpe'].includes(e)) return 'image/jpeg';
+    if (['png'].includes(e)) return 'image/png';
+    if (['webp'].includes(e)) return 'image/webp';
+    if (['heic', 'heif'].includes(e)) return 'image/heic';
+    return 'image/jpeg'; // дефолт
+  };
+
+  /** Загрузка файла в Firebase Storage + возврат downloadURL */
+  const uploadImageAsync = async (uri: string): Promise<string> => {
+    if (!user) throw new Error('User not found');
+
+    const cleanUri = uri.split('?')[0];
+    const extGuess = cleanUri.split('.').pop() || 'jpg';
+    const ext = extGuess.length <= 5 ? extGuess : 'jpg';
+
+    // кладём в подпапку uid
+    const filename = `avatars/${user.uid}/profile-${Date.now()}.${ext}`;
+    const ref = storage().ref(filename);
+
+    // передаём contentType
+    const metadata = { contentType: mimeFromExt(ext) };
+
+    await ref.putFile(uri, metadata);
+    return await ref.getDownloadURL();
+  };
+
   const handleAvatarSelect = async () => {
+    const spinner = useSpinnerStore.getState();
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission denied', 'Sorry, we need camera roll permissions to make this work!');
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission denied', 'We need access to your photos to set an avatar.');
         return;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 1,
+        quality: 0.9,
+        selectionLimit: 1,
+        exif: false,
       });
 
-      if (!result.canceled) {
-        const localUri = result.assets[0].uri;
-        setEditingAvatar(true);
-        setAvatar(localUri);
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert('Error', 'Failed to pick image.');
-    }
-  };
+      if (result.canceled) return;
 
-  const handleAvatarConfirm = async (localUri) => {
-    try {
-      if (!user) return;
-      const storageRef = storage().ref(`avatars/${user.uid}.jpg`);
-      await storageRef.putFile(localUri);
-      const downloadUrl = await storageRef.getDownloadURL();
+      const localUri = result.assets?.[0]?.uri;
+      if (!localUri) {
+        Alert.alert('Error', 'No file selected.');
+        return;
+      }
+
+      spinner.show('Uploading photo...');
+      const downloadUrl = await uploadImageAsync(localUri);
+
       setAvatar(downloadUrl);
       setImageOk(true);
-    } catch (e) {
-      Alert.alert('Error', 'Failed to upload image.');
+
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(
+        userRef,
+        { avatar: downloadUrl, updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+
+      Alert.alert('Done', 'Avatar updated.');
+    } catch (e: any) {
+      console.log('Upload error:', e?.code, e?.message);
+      Alert.alert('Error', e?.message || 'Failed to upload image.');
     } finally {
-      setEditingAvatar(false);
+      spinner.hide();
     }
   };
 
@@ -194,7 +255,11 @@ const SettingsScreen = () => {
 
         <View style={styles.avatarOuter}>
           {avatar && imageOk ? (
-            <Image source={{ uri: avatar }} style={styles.avatar} onError={() => setImageOk(false)} />
+            <Image
+              source={{ uri: avatar }}
+              style={styles.avatar}
+              onError={() => setImageOk(false)}
+            />
           ) : (
             <View style={[styles.avatar, styles.avatarFallback]}>
               <Text style={styles.avatarFallbackText}>
@@ -203,7 +268,11 @@ const SettingsScreen = () => {
             </View>
           )}
 
-          <TouchableOpacity onPress={handleAvatarSelect} activeOpacity={0.9} style={styles.avatarEditBtn}>
+          <TouchableOpacity
+            onPress={handleAvatarSelect}
+            activeOpacity={0.9}
+            style={styles.avatarEditBtn}
+          >
             <MaterialCommunityIcons name="pencil" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -310,18 +379,6 @@ const SettingsScreen = () => {
           <Text style={styles.saveText}>Save</Text>
         </TouchableOpacity>
       </ScrollView>
-
-      <AvatarEditorModal
-        visible={editingAvatar}
-        initialUrl={avatar}
-        onClose={() => setEditingAvatar(false)}
-        onConfirm={handleAvatarConfirm}
-        onClear={() => {
-          setAvatar('');
-          setImageOk(true);
-          setEditingAvatar(false);
-        }}
-      />
 
       <PlacePickerModal
         visible={showCityPicker}
