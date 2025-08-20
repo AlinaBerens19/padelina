@@ -8,7 +8,10 @@
       "env": {
         "IOS_BUNDLE_ID": "com.padelina.app",
         "ANDROID_APPLICATION_ID": "com.padelina.android",
-        "EAS_SKIP_AUTO_FINGERPRINT": "1"
+        "EAS_SKIP_AUTO_FINGERPRINT": "1",
+
+        "GOOGLE_SERVICE_INFO_PLIST": "@GOOGLE_SERVICE_INFO_PLIST",
+        "GOOGLE_SERVICES_JSON": "@GOOGLE_SERVICES_JSON"
       },
       "ios": { "resourceClass": "m-medium" }
     },

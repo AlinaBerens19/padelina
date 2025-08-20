@@ -286,17 +286,6 @@ const SettingsScreen = () => {
           placeholder={loadingProfile ? 'Loading...' : 'Enter full name'}
         />
 
-        <Text style={styles.label}>Location</Text>
-        <TouchableOpacity
-          style={styles.inputPressable}
-          onPress={() => setShowCityPicker(true)}
-          activeOpacity={0.8}
-        >
-          <Text style={location ? styles.inputPressableText : styles.inputPressablePlaceholder}>
-            {location || (loadingProfile ? 'Loading...' : 'City, Country')}
-          </Text>
-        </TouchableOpacity>
-
         <Text style={styles.label}>Address</Text>
         <TouchableOpacity
           style={styles.inputPressable}
@@ -379,16 +368,6 @@ const SettingsScreen = () => {
           <Text style={styles.saveText}>Save</Text>
         </TouchableOpacity>
       </ScrollView>
-
-      <PlacePickerModal
-        visible={showCityPicker}
-        mode="city"
-        onClose={() => setShowCityPicker(false)}
-        onPick={({ label, lat, lng }) => {
-          setLocation(label);
-          setLocationCoords({ lat, lng });
-        }}
-      />
 
       <PlacePickerModal
         visible={showAddressPicker}

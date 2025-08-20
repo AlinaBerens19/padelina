@@ -8,16 +8,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import 'react-native-get-random-values'; // важно: полифилл для uuid/crypto
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import 'react-native-get-random-values';
+import GooglePlacesTextInput from 'react-native-google-places-textinput';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-function getGooglePlacesKey(): string | undefined {
-  const fromExpoConfig = (Constants.expoConfig?.extra as any)?.GOOGLE_PLACES_KEY;
-  const fromManifest = (Constants as any)?.manifest?.extra?.GOOGLE_PLACES_KEY;
-  const fromEnv = (process.env as any)?.EXPO_PUBLIC_GOOGLE_PLACES_KEY;
-  return fromExpoConfig || fromManifest || fromEnv;
-}
 
 type Props = {
   visible: boolean;
@@ -25,6 +18,13 @@ type Props = {
   mode: 'city' | 'address';
   onPick: (data: { label: string; lat: number; lng: number }) => void;
 };
+
+function getGooglePlacesKey(): string | undefined {
+  const fromExpoConfig = (Constants.expoConfig?.extra as any)?.GOOGLE_PLACES_KEY;
+  const fromManifest = (Constants as any)?.manifest?.extra?.GOOGLE_PLACES_KEY;
+  const fromEnv = (process.env as any)?.EXPO_PUBLIC_GOOGLE_PLACES_KEY;
+  return fromExpoConfig || fromManifest || fromEnv;
+}
 
 export const PlacePickerModal: React.FC<Props> = ({
   visible,
@@ -59,12 +59,11 @@ export const PlacePickerModal: React.FC<Props> = ({
     );
   }
 
-  const query: any = {
-    key: GOOGLE_KEY,
-    language: 'he',
-    components: 'country:il',
-    ...(mode === 'city' ? { types: '(cities)' } : { types: 'address' }),
-  };
+  // Конфигурация запроса: язык/регион и фильтр типов
+  const languageCode = 'he';
+  const includedRegionCodes = ['il'];
+  // Для городов — специальный фильтр "(cities)"; для адресов — можно оставить пустым или перечислить типы адресов
+  const types = mode === 'city' ? ['(cities)'] : ['street_address', 'route', 'premise'];
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -75,34 +74,69 @@ export const PlacePickerModal: React.FC<Props> = ({
           </TouchableOpacity>
         </View>
 
-        <GooglePlacesAutocomplete
-          placeholder={placeholder}
-          fetchDetails
-          enablePoweredByContainer={false}
-          minLength={2}
-          debounce={200}
-          predefinedPlaces={[]}               // гарантируем массив
-          keepResultsAfterBlur={false}
-          listUnderlayColor="transparent"
-          onFail={(err) => console.warn('Places error', err)}
-          query={query}
-          // 🔧 критично: передаём textInputProps, чтобы не было undefined.onFocus
-          textInputProps={{
-            onFocus: () => {},
-            onBlur: () => {},
-            autoCapitalize: 'none',
-            autoCorrect: false,
-            returnKeyType: 'search',
-            placeholderTextColor: '#999',
+        <GooglePlacesTextInput
+          apiKey={GOOGLE_KEY}
+          placeHolderText={placeholder}
+          // Поиск
+          languageCode={languageCode}
+          includedRegionCodes={includedRegionCodes}
+          types={types}
+          minCharsToFetch={2}
+          debounceDelay={200}
+          // Детали места (чтобы получить координаты)
+          fetchDetails={true}
+          detailsFields={[
+            'displayName',
+            'formattedAddress',
+            'location',      // вернёт LatLng: { latitude, longitude } — см. Places API (New) поля. :contentReference[oaicite:1]{index=1}
+            'viewport',
+            'types',
+          ]}
+          // UI и поведение в модалке со скроллом
+          scrollEnabled={false}
+          nestedScrollEnabled={false}
+          showClearButton={true}
+          showLoadingIndicator={true}
+          // Стили (минимальные)
+          style={{
+            container: { paddingHorizontal: 16 },
+            input: {
+              height: 50,
+              borderColor: '#ccc',
+              borderWidth: 1,
+              borderRadius: 8,
+              paddingHorizontal: 12,
+              fontSize: 16,
+              marginTop: 8,
+            },
+            suggestionsContainer: { backgroundColor: '#fff', maxHeight: 300 },
+            suggestionItem: { paddingVertical: 12, paddingHorizontal: 8 },
+            suggestionText: {
+              main: { fontSize: 16, color: '#333' },
+              secondary: { fontSize: 13, color: '#666' },
+            },
+            placeholder: { color: '#999' },
           }}
-          onPress={(data, details) => {
+          // Ошибки
+          onError={(err: any) => {
+            console.warn('Places error', err);
+          }}
+          // Выбор места
+          onPlaceSelect={(place: any) => {
+            // label: сначала отформатированный адрес, потом текстовое имя
             const label =
-              mode === 'city'
-                ? data?.structured_formatting?.main_text || data?.description
-                : details?.formatted_address || data?.description;
+              place?.details?.formattedAddress ||
+              place?.details?.displayName?.text ||
+              place?.displayName?.text ||
+              '';
 
-            const lat = details?.geometry?.location?.lat;
-            const lng = details?.geometry?.location?.lng;
+            // координаты: в новом API LatLng => { latitude, longitude }
+            const lat =
+              place?.details?.location?.latitude ??
+              place?.location?.latitude;
+            const lng =
+              place?.details?.location?.longitude ??
+              place?.location?.longitude;
 
             if (typeof lat === 'number' && typeof lng === 'number' && label) {
               onPick({ label, lat, lng });
@@ -111,21 +145,10 @@ export const PlacePickerModal: React.FC<Props> = ({
               Alert.alert('Error', 'Could not read place coordinates.');
             }
           }}
-          styles={{
-            textInput: {
-              height: 50,
-              borderColor: '#ccc',
-              borderWidth: 1,
-              borderRadius: 8,
-              paddingHorizontal: 12,
-              fontSize: 16,
-              marginHorizontal: 16,
-              marginTop: 8,
-            },
-            listView: { marginHorizontal: 16 },
-          }}
         />
       </SafeAreaView>
     </Modal>
   );
 };
+
+export default PlacePickerModal;

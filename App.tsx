@@ -1,8 +1,9 @@
 // App.tsx
-import 'expo-dev-client'; // dev-client (опционально)
-import 'react-native-gesture-handler'; // 👈 ОБЯЗАТЕЛЬНО самым первым
-import 'react-native-get-random-values'; // uuid/crypto (nonce)
-import './src/polyfills/networking'; // патч RN Networking (timeout/withCredentials)
+import 'expo-dev-client';
+import 'react-native-gesture-handler';
+import 'react-native-get-random-values';
+import './src/polyfills/xhr-sanitize'; // 👈 новый мягкий патч
+// (удали любые прежние polyfills/networking)
 
 import { getApp } from '@react-native-firebase/app';
 import React from 'react';
@@ -17,7 +18,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { configureGoogleSignIn } from './src/services/firebase/auth';
 
 export default function App() {
-  const { initializing, isAuthenticated } = useAuth();
+  const { initializing } = useAuth();
 
   React.useEffect(() => {
     // Инициализация Google Sign-In один раз на старте
@@ -32,21 +33,15 @@ export default function App() {
     }
   }, []);
 
-  if (initializing) {
-    return (
-      <SafeAreaProvider>
+  return (
+    <SafeAreaProvider>
+      {initializing ? (
         <SafeAreaView style={styles.spinnerScreen}>
           <SpinnerOverlay />
         </SafeAreaView>
-      </SafeAreaProvider>
-    );
-  }
-
-
-  return (
-    <SafeAreaProvider>
-      <AppNavigator isAuthenticated={isAuthenticated} />
-      <SpinnerOverlay />
+      ) : (
+        <AppNavigator />
+      )}
     </SafeAreaProvider>
   );
 }
@@ -60,4 +55,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-

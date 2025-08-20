@@ -1,12 +1,19 @@
 // app.config.js
 // Динамический конфиг Expo. Берём базу из app.json и ЖЁСТКО подставляем пути
-// к Firebase-файлам из EAS file env (без локальных fallback-ов).
+// к Firebase-файлам из EAS file env. Для локальной интроспекции даём мягкий fallback.
 // iOS: GOOGLE_SERVICE_INFO_PLIST (type: file)
 // Android: GOOGLE_SERVICES_JSON (type: file)
-// Плагины: RNFirebase, expo-build-properties (iOS static frameworks), Google Sign-In, Apple Auth.
 
 const base = require('./app.json');
-const expoCfg = base.expo || base; // не используем "expo" напрямую
+const expoCfg = base.expo || base;
+
+// ⬇️ helper: если env — плейсхолдер @NAME или пусто, используем локальный fallback.
+// На билдере EAS сюда придёт абсолютный путь, и fallback не понадобится.
+function resolveFileEnv(envKey, localFallback) {
+  const v = process.env[envKey];
+  if (!v || v.startsWith('@')) return localFallback;
+  return v;
+}
 
 function fixIosUrlSchemes(ios) {
   const reversedFromEnv = process.env.REVERSED_CLIENT_ID;
@@ -27,7 +34,7 @@ function fixIosUrlSchemes(ios) {
   if (reversedFromEnv) {
     infoPlist.CFBundleURLTypes = [{ CFBundleURLSchemes: [reversedFromEnv] }];
   } else if (hasPlaceholder || !alreadyHasReversed) {
-    // Плагин @react-native-google-signin/google-signin подтянет схему из GoogleService-Info.plist
+    // google-signin подтянет схему из GoogleService-Info.plist
   }
 
   return { ...ios, infoPlist };
@@ -47,14 +54,26 @@ function withPlugins(existing = []) {
   add('@react-native-google-signin/google-signin');
   add('expo-apple-authentication');
 
+  // Image Picker: пропишем описания для Info.plist
+  add([
+    'expo-image-picker',
+    {
+      photosPermission: 'We need access to your photos to set your avatar',
+      cameraPermission: 'We need camera access to take your avatar photo',
+    },
+  ]);
+
   return plugins;
 }
 
 module.exports = () => {
-  // iOS: только из ENV, без локальных fallback’ов
   const ios = {
     ...(expoCfg.ios || {}),
-    googleServicesFile: process.env.GOOGLE_SERVICE_INFO_PLIST, // ⬅️ ТОЛЬКО ENV
+    // ⬇️ используем env, но если локально приходит "@NAME", берём локальный файл
+    googleServicesFile: resolveFileEnv(
+      'GOOGLE_SERVICE_INFO_PLIST',
+      './GoogleService-Info.plist'
+    ),
     bundleIdentifier:
       process.env.IOS_BUNDLE_ID ||
       (expoCfg.ios && expoCfg.ios.bundleIdentifier) ||
@@ -62,10 +81,12 @@ module.exports = () => {
   };
   const iosFixed = fixIosUrlSchemes(ios);
 
-  // Android: только из ENV, без локальных fallback’ов
   const android = {
     ...(expoCfg.android || {}),
-    googleServicesFile: process.env.GOOGLE_SERVICES_JSON, // ⬅️ ТОЛЬКО ENV
+    googleServicesFile: resolveFileEnv(
+      'GOOGLE_SERVICES_JSON',
+      './google-services.json'
+    ),
     package:
       process.env.ANDROID_APPLICATION_ID ||
       (expoCfg.android && expoCfg.android.package) ||
@@ -73,7 +94,6 @@ module.exports = () => {
   };
 
   return {
-    // Базовые поля из app.json
     ...expoCfg,
     ios: { ...iosFixed, usesAppleSignIn: true },
     android,

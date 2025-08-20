@@ -40,7 +40,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
       Keyboard.dismiss();
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (e: any) {
       const msg = mapAuthError(e?.code, e?.message);
       Alert.alert('Login failed', msg);
@@ -74,7 +74,7 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
       const credential = GoogleAuthProvider.credential(idToken);
       await signInWithCredential(auth, credential);
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (e: any) {
       const msg = e?.message || String(e);
       if (!/cancel/i.test(msg)) Alert.alert('Google Sign-In', msg);

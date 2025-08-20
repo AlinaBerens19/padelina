@@ -2,7 +2,7 @@
 
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import { navigationRef } from './navigationRef';
@@ -13,39 +13,38 @@ import RegisterScreen from '../screens/Auth/RegisterScreen';
 import MainStackNavigator from './MainStackNavigator';
 import { RootStackParamList } from './types';
 
-import auth from '@react-native-firebase/auth';
+import { getAuth } from '@react-native-firebase/auth';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
   const { user, initializing } = useAuth();
+  const [navReady, setNavReady] = useState(false);
 
   useEffect(() => {
-    if (!initializing && user) {
+    if (initializing || !navReady) return;
+
+    if (user) {
       verifyUser();
-    } else if (!initializing && !user) {
+    } else {
       navigationRef.current?.reset({ index: 0, routes: [{ name: 'Login' }] });
     }
-  }, [initializing, user?.uid]);
+  }, [initializing, navReady, user?.uid]);
 
   const verifyUser = async () => {
     try {
-      await auth().currentUser?.reload(); // 🔄 Получаем актуальные данные о пользователе
-      const refreshedUser = auth().currentUser;
+      const auth = getAuth();
+      await auth.currentUser?.reload();
+      const refreshedUser = auth.currentUser;
 
       if (refreshedUser?.emailVerified) {
+        // Вложенный ресет на экран "Home" ВНУТРИ MainStackNavigator
         navigationRef.current?.reset({
           index: 0,
-          routes: [
-            {
-              name: 'Main',
-              state: {
-                index: 0,
-                routes: [{ name: 'BottomTabs', params: { userId: refreshedUser.uid } }],
-              },
-            },
-          ],
+          routes: [{ name: 'Main', state: { index: 0, routes: [{ name: 'Home' }] } }],
         });
+        // Либо просто:
+        // navigationRef.current?.reset({ index: 0, routes: [{ name: 'Main' }] });
       } else {
         navigationRef.current?.reset({ index: 0, routes: [{ name: 'EmailVerification' }] });
       }
@@ -64,7 +63,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} onReady={() => setNavReady(true)}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Main" component={MainStackNavigator} />
         <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />

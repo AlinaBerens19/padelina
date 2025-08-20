@@ -9,7 +9,6 @@ export type MainStackParamList = {
   Home: undefined;
   Settings: undefined;
   UserProfile: { userId: string };
-  UserLevel: { userId: string };
 };
 
 const MainStack = createNativeStackNavigator<MainStackParamList>();
