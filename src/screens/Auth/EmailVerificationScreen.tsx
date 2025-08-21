@@ -1,5 +1,6 @@
 // src/screens/Auth/EmailVerificationScreen.tsx
-import { getAuth, reload, sendEmailVerification, signOut } from '@react-native-firebase/auth';
+import { getAuth
+  , sendEmailVerification, signOut } from '@react-native-firebase/auth';
 import { CommonActions, } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import LoadingButton from 'components/LoadingButton';
@@ -25,7 +26,7 @@ const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({ navig
         return;
       }
 
-      await reload(user);
+      await user.reload();
       const updatedUser = authInstance.currentUser;
       const verified = updatedUser?.emailVerified ?? false;
 

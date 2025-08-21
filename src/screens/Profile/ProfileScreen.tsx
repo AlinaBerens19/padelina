@@ -41,6 +41,8 @@ type Profile = {
 
 const safeText = (v?: string | null) => (v && v.trim().length ? v.trim() : '—');
 
+// ...импорты без изменений
+
 const ProfileScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user, isAuthenticated } = useAuth();
@@ -48,6 +50,7 @@ const ProfileScreen = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [imageOk, setImageOk] = useState(true);
+  const [avatarLoading, setAvatarLoading] = useState(true); // <--- добавлено
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -59,7 +62,8 @@ const ProfileScreen = () => {
       snap => {
         setProfile(snap.exists() ? (snap.data() as Profile) : null);
         setLoading(false);
-        setImageOk(true); // при обновлении профиля попробуем снова показать картинку
+        setImageOk(true);
+        setAvatarLoading(true); // сброс при обновлении
       },
       err => {
         console.error('Firestore profile error:', err);
@@ -93,11 +97,9 @@ const ProfileScreen = () => {
     );
   }
 
-  // Шапка: Firestore -> Firebase Auth -> заглушка
   const name = safeText(profile?.name ?? user.displayName);
   const email = safeText(profile?.email ?? user.email);
 
-  // основное: читаем фото из поля `avatar` (и поддерживаем `avatarUrl`)
   const photo =
     (profile?.avatar && profile.avatar.trim()) ||
     (profile?.avatarUrl && profile.avatarUrl.trim()) ||
@@ -124,34 +126,55 @@ const ProfileScreen = () => {
       <ScrollView contentContainerStyle={styles.container}>
         {/* Шапка профиля */}
         <View style={styles.profileSection}>
-          {photo && imageOk ? (
-            <Image
-              source={{ uri: photo }}
-              style={styles.avatar}
-              onError={() => setImageOk(false)}
-              // можно раскомментировать, если есть локальный плейсхолдер
-              // defaultSource={require('../../../assets/avatar-placeholder.png')}
-            />
-          ) : (
-            FallbackAvatar
-          )}
+
+   <View style={styles.avatar}>
+  {(avatarLoading || !imageOk) && (
+    <View
+      style={[
+        styles.avatar,
+        {
+          position: 'absolute',
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: '#ccc',
+          zIndex: 1,
+        },
+          ]}
+        >
+          <Text style={{ color: '#fff', fontSize: 18 }}>{name[0] || '?'}</Text>
+        </View>
+      )}
+
+      {photo && imageOk && (
+        <Image
+          source={{ uri: photo }}
+          style={styles.avatar}
+          onLoadEnd={() => setAvatarLoading(false)}
+          onError={() => {
+            setImageOk(false);
+            setAvatarLoading(false);
+          }}
+        />
+      )}
+    </View>
+
 
           <Text style={styles.name}>{name}</Text>
           <View style={styles.locationRow}>
             <Text style={styles.location}>{email}</Text>
             <TouchableOpacity
               style={styles.settingsButton}
-              onPress={() => navigation.navigate('Main', {
-                          screen: 'Settings',
-                        })}
-
+              onPress={() =>
+                navigation.navigate('Main', {
+                  screen: 'Settings',
+                })
+              }
             >
               <Ionicons name="settings-outline" size={22} color="#666" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Карточка UserProfile */}
         <UserProfile
           level={profile?.level}
           favouriteSport={profile?.favouriteSport}
@@ -162,7 +185,6 @@ const ProfileScreen = () => {
           onPhonePress={callPhone}
         />
 
-        {/* Выход */}
         <TouchableOpacity
           onPress={async () => {
             try {
@@ -182,3 +204,4 @@ const ProfileScreen = () => {
 };
 
 export default ProfileScreen;
+
