@@ -4,25 +4,26 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "ios": {
-        "resourceClass": "m-medium",
-        "build": {
-          "pre-install": "echo $GOOGLE_SERVICE_INFO_PLIST > $EAS_BUILD_ROOT/GoogleService-Info.plist",
-          "env": {
-            "EAS_SKIP_AUTO_FINGERPRINT": "1"
-          }
-        }
-      }
+      "environment": "development",
+      "env": {
+        "IOS_BUNDLE_ID": "com.padelina.app",
+        "ANDROID_APPLICATION_ID": "com.padelina.android",
+        "EAS_SKIP_AUTO_FINGERPRINT": "1",
+
+        "GOOGLE_SERVICE_INFO_PLIST": "@GOOGLE_SERVICE_INFO_PLIST",
+        "GOOGLE_SERVICES_JSON": "@GOOGLE_SERVICES_JSON"
+      },
+      "ios": { "resourceClass": "m-medium" }
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
       "ios": { "resourceClass": "m-medium" }
     },
     "production": {
       "autoIncrement": true,
-      "ios": {
-        "resourceClass": "m-medium"
-      }
+      "environment": "production",
+      "ios": { "resourceClass": "m-medium" }
     }
   },
   "submit": { "production": {} }
