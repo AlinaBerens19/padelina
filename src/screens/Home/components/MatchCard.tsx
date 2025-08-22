@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { doc, getDoc } from '@react-native-firebase/firestore';
+import { Image } from 'expo-image'; // Заменено на expo-image
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Text, TouchableOpacity, View } from 'react-native';
 
 import { db } from 'services/firebase/init';
 import { Match } from '../WelcomeScreen';
@@ -17,8 +18,11 @@ interface Props {
 type PlayerProfile = {
   id: string;
   name?: string | null;
-  avatar?: string | null; // поле "avatar" как в скрине
+  avatar?: string | null;
 };
+
+// Небольшой блюр-плейсхолдер для плавной загрузки
+const BLUR = 'L5H2EC=PM+yV0g-mq.wG9c010J}I';
 
 const MatchCard: React.FC<Props> = ({ item, onWaze, onWhatsApp, onCall }) => {
   const players: string[] = useMemo(() => (Array.isArray(item.players) ? item.players : []), [item.players]);
@@ -81,7 +85,11 @@ const MatchCard: React.FC<Props> = ({ item, onWaze, onWhatsApp, onCall }) => {
     <View style={styles.card}>
       <View style={styles.topRow}>
         {item.imageUrl ? (
-          <Image source={{ uri: item.imageUrl }} style={styles.thumb} resizeMode="cover" />
+          <Image
+            source={{ uri: item.imageUrl }}
+            style={{ width: 48, height: 48, borderRadius: 24 }}
+            resizeMode="cover"
+          />
         ) : (
           <View style={styles.thumbPlaceholder}>
             <Text style={styles.thumbPlaceholderText}>No image</Text>
@@ -116,7 +124,11 @@ const MatchCard: React.FC<Props> = ({ item, onWaze, onWhatsApp, onCall }) => {
             style={[styles.avatar, { zIndex: 10 - idx, left: idx * 60, width: 48, height: 48, borderRadius: 24 }]}
           >
             {p.avatar ? (
-              <Image source={{ uri: p.avatar }} style={{ width: 48, height: 48, borderRadius: 24 }} />
+              <Image
+                source={{ uri: p.avatar }}
+                style={{ width: 48, height: 48, borderRadius: 24 }}
+                resizeMode="cover"
+              />
             ) : (
               <Text style={styles.avatarText}>{initials(p.name) || '??'}</Text>
             )}

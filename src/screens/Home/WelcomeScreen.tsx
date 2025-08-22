@@ -7,15 +7,17 @@ import {
   Platform,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import {
   collection,
+  getDocs,
   onSnapshot,
   query,
+  where
 } from '@react-native-firebase/firestore';
 
 import { db } from '../../services/firebase/init';
@@ -23,6 +25,12 @@ import { useSpinnerStore } from '../../store/spinnerStore';
 import { styles } from './WelcomeScreen.styles';
 import AddMatchModal from './components/AddMatchModal';
 import MatchCard from './components/MatchCard';
+
+type PlayerProfile = {
+  id: string;
+  name?: string | null;
+  avatar?: string | null;
+};
 
 export type Match = {
   id: string;
@@ -37,6 +45,7 @@ export type Match = {
   playersCount?: number;
   imageUrl?: string | null;
   singles?: boolean;
+  playerProfiles?: PlayerProfile[]; // Add this to store fetched profiles
 };
 
 export default function WelcomeScreen() {
@@ -47,10 +56,11 @@ export default function WelcomeScreen() {
     const spinner = useSpinnerStore.getState();
     spinner.show('Loading matches...');
     const q = query(collection(db, 'matches'));
+
     const unsub = onSnapshot(
       q,
-      (snapshot) => {
-        const list: Match[] = snapshot.docs.map((docSnap) => {
+      async (snapshot) => {
+        const matchesList: Match[] = snapshot.docs.map((docSnap) => {
           const d = docSnap.data() as Record<string, any>;
           const players = Array.isArray(d.players) ? d.players : [];
           const maxPlayers = Number.isFinite(Number(d.maxPlayers))
@@ -81,7 +91,58 @@ export default function WelcomeScreen() {
             singles: !!d.singles,
           };
         });
-        setMatches(list);
+
+        // 1. Collect all unique player IDs from all matches
+        const allPlayerIds = new Set<string>();
+        matchesList.forEach((match) => {
+          match.players?.forEach((uid) => allPlayerIds.add(uid));
+        });
+
+        const playersToFetch = Array.from(allPlayerIds);
+        const playerProfiles: Record<string, PlayerProfile> = {};
+
+        if (playersToFetch.length > 0) {
+          // 2. Fetch all player profiles in a single batched query
+          try {
+            const usersRef = collection(db, 'users');
+            // Firestore 'in' operator has a limit of 10 items.
+            // Split the array into chunks of 10 or less
+            const chunkedPlayerIds = [];
+            for (let i = 0; i < playersToFetch.length; i += 10) {
+              chunkedPlayerIds.push(playersToFetch.slice(i, i + 10));
+            }
+
+            const queryPromises = chunkedPlayerIds.map(chunk => {
+              // Исправлено: используем '__name__' для запроса по ID
+              const q = query(usersRef, where('__name__', 'in', chunk));
+              return getDocs(q);
+            });
+
+            const snapshots = await Promise.all(queryPromises);
+
+            snapshots.forEach(snapshot => {
+              snapshot.forEach(userDoc => {
+                const data = userDoc.data() as any;
+                playerProfiles[userDoc.id] = {
+                  id: userDoc.id,
+                  name: data?.name ?? data?.fullName ?? null,
+                  avatar: data?.avatar ?? data?.avatarUrl ?? null,
+                };
+              });
+            });
+
+          } catch (e) {
+            console.error('Failed to fetch player profiles:', e);
+          }
+        }
+        
+        // 3. Attach the fetched profiles to each match object
+        const updatedMatchesList = matchesList.map((match) => ({
+          ...match,
+          playerProfiles: match.players?.map(uid => playerProfiles[uid]) || [],
+        }));
+
+        setMatches(updatedMatchesList);
         spinner.hide();
       },
       (e) => {
@@ -89,6 +150,7 @@ export default function WelcomeScreen() {
         spinner.hide();
       }
     );
+
     return () => {
       spinner.hide();
       unsub();
