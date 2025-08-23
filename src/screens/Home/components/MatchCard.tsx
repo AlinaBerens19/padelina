@@ -87,8 +87,7 @@ const MatchCard: React.FC<Props> = ({ item, onWaze, onWhatsApp, onCall }) => {
         {item.imageUrl ? (
           <Image
             source={{ uri: item.imageUrl }}
-            style={{ width: 48, height: 48, borderRadius: 24 }}
-            resizeMode="cover"
+            style={{ width: 108, height: 88, borderRadius: 12 }}
           />
         ) : (
           <View style={styles.thumbPlaceholder}>
@@ -121,13 +120,12 @@ const MatchCard: React.FC<Props> = ({ item, onWaze, onWhatsApp, onCall }) => {
         {profiles.slice(0, 4).map((p, idx) => (
           <View
             key={`${p.id}-${idx}`}
-            style={[styles.avatar, { zIndex: 10 - idx, left: idx * 60, width: 48, height: 48, borderRadius: 24 }]}
+            style={[styles.avatar, { zIndex: 10 - idx, left: idx * 60, width: 58, height: 58, borderRadius: 36 }]}
           >
             {p.avatar ? (
               <Image
                 source={{ uri: p.avatar }}
-                style={{ width: 48, height: 48, borderRadius: 24 }}
-                resizeMode="cover"
+                style={{ width: 58, height: 58, borderRadius: 36 }}
               />
             ) : (
               <Text style={styles.avatarText}>{initials(p.name) || '??'}</Text>
@@ -137,7 +135,7 @@ const MatchCard: React.FC<Props> = ({ item, onWaze, onWhatsApp, onCall }) => {
         {Array.from({ length: Math.max(0, 4 - profiles.length) }).map((_, idx) => {
           const offset = (profiles.length + idx) * 60;
           return (
-            <View key={`ph-${idx}`} style={[styles.avatar, styles.avatarPlaceholder, { left: offset, width: 48, height: 48, borderRadius: 24 }]} />
+            <View key={`ph-${idx}`} style={[styles.avatar, styles.avatarPlaceholder, { left: offset, width: 58, height: 58, borderRadius: 36 }]} />
           );
         })}
       </View>

@@ -28,4 +28,6 @@
 
 # eas build --platform ios --profile development --clear-cache
 
+# npx expo start --dev-client -c  
+
 

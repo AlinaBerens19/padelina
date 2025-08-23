@@ -17,9 +17,10 @@ import {
   getDocs,
   onSnapshot,
   query,
-  where
+  where,
 } from '@react-native-firebase/firestore';
 
+import storage from '@react-native-firebase/storage';
 import { db } from '../../services/firebase/init';
 import { useSpinnerStore } from '../../store/spinnerStore';
 import { styles } from './WelcomeScreen.styles';
@@ -45,7 +46,7 @@ export type Match = {
   playersCount?: number;
   imageUrl?: string | null;
   singles?: boolean;
-  playerProfiles?: PlayerProfile[]; // Add this to store fetched profiles
+  playerProfiles?: PlayerProfile[];
 };
 
 export default function WelcomeScreen() {
@@ -60,6 +61,8 @@ export default function WelcomeScreen() {
     const unsub = onSnapshot(
       q,
       async (snapshot) => {
+        console.log('🔥 Snapshot received with', snapshot.docs.length, 'matches');
+
         const matchesList: Match[] = snapshot.docs.map((docSnap) => {
           const d = docSnap.data() as Record<string, any>;
           const players = Array.isArray(d.players) ? d.players : [];
@@ -92,61 +95,78 @@ export default function WelcomeScreen() {
           };
         });
 
-        // 1. Collect all unique player IDs from all matches
+        console.log('🟡 Parsed matches:', matchesList);
+
         const allPlayerIds = new Set<string>();
         matchesList.forEach((match) => {
           match.players?.forEach((uid) => allPlayerIds.add(uid));
         });
 
         const playersToFetch = Array.from(allPlayerIds);
+        console.log('👥 Unique player IDs to fetch:', playersToFetch);
+
         const playerProfiles: Record<string, PlayerProfile> = {};
 
         if (playersToFetch.length > 0) {
-          // 2. Fetch all player profiles in a single batched query
           try {
             const usersRef = collection(db, 'users');
-            // Firestore 'in' operator has a limit of 10 items.
-            // Split the array into chunks of 10 or less
             const chunkedPlayerIds = [];
             for (let i = 0; i < playersToFetch.length; i += 10) {
               chunkedPlayerIds.push(playersToFetch.slice(i, i + 10));
             }
 
-            const queryPromises = chunkedPlayerIds.map(chunk => {
-              // Исправлено: используем '__name__' для запроса по ID
+            const queryPromises = chunkedPlayerIds.map((chunk) => {
               const q = query(usersRef, where('__name__', 'in', chunk));
               return getDocs(q);
             });
 
             const snapshots = await Promise.all(queryPromises);
 
-            snapshots.forEach(snapshot => {
-              snapshot.forEach(userDoc => {
+            for (const snapshot of snapshots) {
+              for (const userDoc of snapshot.docs) {
                 const data = userDoc.data() as any;
+                const rawPath = data?.avatar ?? data?.avatarUrl ?? null;
+
+let avatar: string | null = null;
+
+                if (typeof rawPath === 'string' && rawPath.length > 0) {
+                  if (rawPath.startsWith('http')) {
+                    // это уже абсолютный URL (например, Instagram) — используем напрямую
+                    avatar = rawPath;
+                  } else {
+                    try {
+                      avatar = await storage().ref(rawPath).getDownloadURL();
+                    } catch (err) {
+                      console.warn('⚠️ Failed to load avatar from storage for', userDoc.id, rawPath, err);
+                    }
+                  }
+                }
                 playerProfiles[userDoc.id] = {
                   id: userDoc.id,
                   name: data?.name ?? data?.fullName ?? null,
-                  avatar: data?.avatar ?? data?.avatarUrl ?? null,
+                  avatar,
                 };
-              });
-            });
+              }
+            }
 
+            console.log('✅ Loaded player profiles:', playerProfiles);
           } catch (e) {
-            console.error('Failed to fetch player profiles:', e);
+            console.error('❌ Failed to fetch player profiles:', e);
           }
         }
-        
-        // 3. Attach the fetched profiles to each match object
+
         const updatedMatchesList = matchesList.map((match) => ({
           ...match,
-          playerProfiles: match.players?.map(uid => playerProfiles[uid]) || [],
+          playerProfiles: match.players?.map((uid) => playerProfiles[uid]) || [],
         }));
+
+        console.log('✅ Final match list with profiles:', updatedMatchesList);
 
         setMatches(updatedMatchesList);
         spinner.hide();
       },
       (e) => {
-        console.error('Failed to fetch matches:', e);
+        console.error('❌ Failed to fetch matches:', e);
         spinner.hide();
       }
     );
