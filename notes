@@ -25,3 +25,7 @@
 
 ; # Обновить список удалённых веток (почистить удалённые)
 ; git fetch --all --prune
+
+# eas build --platform ios --profile development --clear-cache
+
+
