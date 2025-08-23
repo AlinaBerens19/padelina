@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import { signOut } from '@react-native-firebase/auth';
+import { doc, getDoc } from '@react-native-firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
@@ -14,66 +16,57 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { signOut } from '@react-native-firebase/auth';
-import { doc, onSnapshot } from '@react-native-firebase/firestore';
-
 import UserProfile from 'components/UserProfile';
+import { useAuth } from 'hooks/useAuth';
+import type { RootStackParamList } from 'navigation/types';
+import { db } from 'services/firebase/db';
 import { auth } from 'services/firebase/init';
-import { useAuth } from '../../hooks/useAuth';
-import type { RootStackParamList } from '../../navigation/types';
-import { db } from '../../services/firebase/db';
+import { useUserStore } from 'store/userStore';
 import { styles } from './UserProfile.styles';
 
-type Profile = {
-  level?: number;
-  favouriteSport?: string;
-  /** новое поле из БД */
-  avatar?: string;
-  /** на всякий случай поддержим старое имя */
-  avatarUrl?: string;
-  name?: string;
-  email?: string;
-  location?: string;
-  phone?: string;
-  address?: string;
-  updatedAt?: any; // Firestore Timestamp
-};
-
 const safeText = (v?: string | null) => (v && v.trim().length ? v.trim() : '—');
-
-// ...импорты без изменений
 
 const ProfileScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user, isAuthenticated } = useAuth();
+  const { profile, setProfile } = useUserStore();
 
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!profile);
   const [imageOk, setImageOk] = useState(true);
-  const [avatarLoading, setAvatarLoading] = useState(true); // <--- добавлено
+  const [avatarLoading, setAvatarLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.uid) return;
-    setLoading(true);
+    if (!user?.uid || profile) return;
 
-    const ref = doc(db, 'users', user.uid);
-    const unsub = onSnapshot(
-      ref,
-      snap => {
-        setProfile(snap.exists() ? (snap.data() as Profile) : null);
-        setLoading(false);
-        setImageOk(true);
-        setAvatarLoading(true); // сброс при обновлении
-      },
-      err => {
-        console.error('Firestore profile error:', err);
-        Alert.alert('Error', 'Failed to load user profile.');
+    const fetchProfile = async () => {
+      setLoading(true);
+      try {
+        const ref = doc(db, 'users', user.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const data = snap.data();
+          setProfile({
+            uid: user.uid,
+            name: data.name ?? '',
+            avatarUrl: data.avatar ?? data.avatarUrl ?? '',
+            email: data.email ?? '',
+            phone: data.phone ?? '',
+            address: data.address ?? '',
+            level: data.level ?? 0,
+            favouriteSport: data.favouriteSport ?? '',
+            updatedAt: data.updatedAt?.toDate?.() ?? undefined,
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to load user profile', e);
+        Alert.alert('Error', 'Failed to load profile');
+      } finally {
         setLoading(false);
       }
-    );
+    };
 
-    return unsub;
-  }, [user?.uid]);
+    fetchProfile();
+  }, [user?.uid, profile]);
 
   if (!isAuthenticated || !user) {
     return (
@@ -87,7 +80,7 @@ const ProfileScreen = () => {
     );
   }
 
-  if (loading) {
+  if (loading || !profile) {
     return (
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
         <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -97,67 +90,45 @@ const ProfileScreen = () => {
     );
   }
 
-  const name = safeText(profile?.name ?? user.displayName);
-  const email = safeText(profile?.email ?? user.email);
-
-  const photo =
-    (profile?.avatar && profile.avatar.trim()) ||
-    (profile?.avatarUrl && profile.avatarUrl.trim()) ||
-    (user.photoURL ?? '');
-
-  const callPhone = (raw: string) => {
-    const tel = raw.replace(/\s+/g, '');
-    Linking.openURL(`tel:${tel}`);
-  };
-
-  const FallbackAvatar = (
-    <View
-      style={[
-        styles.avatar,
-        { backgroundColor: '#ccc', justifyContent: 'center', alignItems: 'center' },
-      ]}
-    >
-      <Text style={{ color: '#fff', fontSize: 18 }}>{name[0] || '?'}</Text>
-    </View>
-  );
+  const name = safeText(profile.name);
+  const email = safeText(profile.email);
+  const photo = profile.avatarUrl?.trim() ?? '';
+  const callPhone = (raw: string) => Linking.openURL(`tel:${raw.replace(/\s+/g, '')}`);
 
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.container}>
         {/* Шапка профиля */}
         <View style={styles.profileSection}>
-
-   <View style={styles.avatar}>
-  {(avatarLoading || !imageOk) && (
-    <View
-      style={[
-        styles.avatar,
-        {
-          position: 'absolute',
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: '#ccc',
-          zIndex: 1,
-        },
-          ]}
-        >
-          <Text style={{ color: '#fff', fontSize: 18 }}>{name[0] || '?'}</Text>
-        </View>
-      )}
-
-      {photo && imageOk && (
-        <Image
-          source={{ uri: photo }}
-          style={styles.avatar}
-          onLoadEnd={() => setAvatarLoading(false)}
-          onError={() => {
-            setImageOk(false);
-            setAvatarLoading(false);
-          }}
-        />
-      )}
-    </View>
-
+          <View style={styles.avatar}>
+            {(avatarLoading || !imageOk) && (
+              <View
+                style={[
+                  styles.avatar,
+                  {
+                    position: 'absolute',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: '#ccc',
+                    zIndex: 1,
+                  },
+                ]}
+              >
+                <Text style={{ color: '#fff', fontSize: 18 }}>{name[0] || '?'}</Text>
+              </View>
+            )}
+            {photo && imageOk && (
+              <Image
+                source={{ uri: photo }}
+                style={styles.avatar}
+                onLoadEnd={() => setAvatarLoading(false)}
+                onError={() => {
+                  setImageOk(false);
+                  setAvatarLoading(false);
+                }}
+              />
+            )}
+          </View>
 
           <Text style={styles.name}>{name}</Text>
           <View style={styles.locationRow}>
@@ -176,12 +147,12 @@ const ProfileScreen = () => {
         </View>
 
         <UserProfile
-          level={profile?.level}
-          favouriteSport={profile?.favouriteSport}
-          location={profile?.location}
-          phone={profile?.phone}
-          address={profile?.address}
-          updatedAt={profile?.updatedAt}
+          level={profile.level}
+          favouriteSport={profile.favouriteSport}
+          location={profile.address}
+          phone={profile.phone}
+          address={profile.address}
+          updatedAt={profile.updatedAt}
           onPhonePress={callPhone}
         />
 
@@ -189,6 +160,7 @@ const ProfileScreen = () => {
           onPress={async () => {
             try {
               await signOut(auth);
+              setProfile(null);
             } catch (e: any) {
               Alert.alert('Ошибка', `Не удалось выйти: ${e?.message ?? 'unknown error'}`);
             }
@@ -204,4 +176,3 @@ const ProfileScreen = () => {
 };
 
 export default ProfileScreen;
-

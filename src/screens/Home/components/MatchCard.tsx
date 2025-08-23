@@ -1,11 +1,11 @@
+// MatchCard.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { doc, getDoc } from '@react-native-firebase/firestore';
-import { Image } from 'expo-image'; // Заменено на expo-image
-import React, { useEffect, useMemo, useState } from 'react';
+import { Image } from 'expo-image';
+import React, { useMemo } from 'react';
 import { Alert, Text, TouchableOpacity, View } from 'react-native';
-
-import { db } from 'services/firebase/init';
-import { Match } from '../WelcomeScreen';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { usePlayerStore } from 'store/playerStore';
+import { Match } from 'types/firebase';
 import { styles } from '../WelcomeScreen.styles';
 
 interface Props {
@@ -15,54 +15,17 @@ interface Props {
   onCall: (phone?: string) => void;
 }
 
-type PlayerProfile = {
-  id: string;
-  name?: string | null;
-  avatar?: string | null;
-};
-
-// Небольшой блюр-плейсхолдер для плавной загрузки
-const BLUR = 'L5H2EC=PM+yV0g-mq.wG9c010J}I';
-
 const MatchCard: React.FC<Props> = ({ item, onWaze, onWhatsApp, onCall }) => {
   const players: string[] = useMemo(() => (Array.isArray(item.players) ? item.players : []), [item.players]);
   const capacity = item.maxPlayers ?? (item.singles ? 2 : 4);
   const isFull = (item.playersCount ?? players.length) >= capacity;
 
-  const [profiles, setProfiles] = useState<PlayerProfile[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!players.length) {
-      setProfiles([]);
-      return;
-    }
-    (async () => {
-      try {
-        const result = await Promise.all(
-          players.slice(0, 4).map(async (uid) => {
-            try {
-              const snap = await getDoc(doc(db, 'users', uid));
-              const data = snap.exists ? (snap.data() as any) : null;
-              return {
-                id: uid,
-                name: data?.name ?? data?.fullName ?? null,
-                avatar: data?.avatar ?? data?.avatarUrl ?? null,
-              } as PlayerProfile;
-            } catch {
-              return { id: uid } as PlayerProfile;
-            }
-          })
-        );
-        if (!cancelled) setProfiles(result);
-      } catch (e) {
-        if (!cancelled) setProfiles(players.slice(0, 4).map((id) => ({ id })));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [players]);
+  const playerStore = usePlayerStore();
+  const profiles = useMemo(() => {
+    return players
+      .slice(0, 4)
+      .map((uid) => playerStore.players[uid] || { id: uid });
+  }, [players, playerStore.players]);
 
   const lines = [
     `₪${Number.isFinite(Number(item.price)) ? Number(item.price) : 0}`,
@@ -82,7 +45,7 @@ const MatchCard: React.FC<Props> = ({ item, onWaze, onWhatsApp, onCall }) => {
       .toUpperCase();
 
   return (
-    <View style={styles.card}>
+    <Animated.View entering={FadeInDown.duration(300)} style={styles.card}>
       <View style={styles.topRow}>
         {item.imageUrl ? (
           <Image
@@ -115,10 +78,10 @@ const MatchCard: React.FC<Props> = ({ item, onWaze, onWhatsApp, onCall }) => {
         </View>
       </View>
 
-      {/* Аватары игроков */}
       <View style={styles.avatarsRow}>
         {profiles.slice(0, 4).map((p, idx) => (
-          <View
+          <Animated.View
+            entering={FadeInUp.delay(idx * 100)}
             key={`${p.id}-${idx}`}
             style={[styles.avatar, { zIndex: 10 - idx, left: idx * 60, width: 58, height: 58, borderRadius: 36 }]}
           >
@@ -130,7 +93,7 @@ const MatchCard: React.FC<Props> = ({ item, onWaze, onWhatsApp, onCall }) => {
             ) : (
               <Text style={styles.avatarText}>{initials(p.name) || '??'}</Text>
             )}
-          </View>
+          </Animated.View>
         ))}
         {Array.from({ length: Math.max(0, 4 - profiles.length) }).map((_, idx) => {
           const offset = (profiles.length + idx) * 60;
@@ -140,7 +103,6 @@ const MatchCard: React.FC<Props> = ({ item, onWaze, onWhatsApp, onCall }) => {
         })}
       </View>
 
-      {/* Join */}
       <TouchableOpacity
         style={[styles.joinButton, isFull && styles.joinButtonDisabled]}
         disabled={isFull}
@@ -151,8 +113,12 @@ const MatchCard: React.FC<Props> = ({ item, onWaze, onWhatsApp, onCall }) => {
       >
         <Text style={styles.joinText}>{isFull ? 'Full' : 'Join'}</Text>
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   );
 };
 
-export default MatchCard;
+function areEqual(prev: Props, next: Props) {
+  return prev.item.id === next.item.id;
+}
+
+export default React.memo(MatchCard, areEqual);
