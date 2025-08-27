@@ -1,12 +1,6 @@
-// WelcomeScreen.tsx
+// path: src/screens/Welcome/WelcomeScreen.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import {
-  collection,
-  getDocs,
-  onSnapshot,
-  query,
-  where,
-} from '@react-native-firebase/firestore';
+import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore'; // ✅ так правильно
 import storage from '@react-native-firebase/storage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -16,7 +10,7 @@ import {
   Platform,
   RefreshControl,
   Text,
-  TouchableOpacity,
+  TouchableOpacity
 } from 'react-native';
 import Animated, {
   BounceIn,
@@ -30,7 +24,7 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Match, PlayerProfile } from 'types/firebase';
-import { db } from '../../services/firebase/init';
+import { createMatch } from '../../services/firebase/matches';
 import { usePlayerStore } from '../../store/playerStore';
 import { useSpinnerStore } from '../../store/spinnerStore';
 import { styles } from './WelcomeScreen.styles';
@@ -47,30 +41,24 @@ export default function WelcomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Глобальный кэш профилей игроков
   const { players: cachedPlayers, addPlayers } = usePlayerStore();
-
-  // Чтобы избежать двойного первого срабатывания в dev-режиме
   const snapshotInitialized = useRef(false);
 
-  /**
-   * Загружаем отсутствующие профили игроков пачками (in / chunks по 10)
-   */
+  // подгружаем недостающие профили игроков
   const fetchMissingPlayers = useCallback(
     async (ids: string[]): Promise<Record<string, PlayerProfile>> => {
       if (ids.length === 0) return {};
 
-      const usersRef = collection(db, 'users');
+      const usersRef = firestore().collection('users');
       const chunks: string[][] = [];
       for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
 
       const results: Record<string, PlayerProfile> = {};
 
       const snaps = await Promise.all(
-        chunks.map((chunk) => {
-          const qUsers = query(usersRef, where('__name__', 'in', chunk));
-          return getDocs(qUsers);
-        })
+        chunks.map((chunk) =>
+          usersRef.where(firestore.FieldPath.documentId(), 'in', chunk).get()
+        )
       );
 
       for (const snap of snaps) {
@@ -82,11 +70,10 @@ export default function WelcomeScreen() {
             null;
 
           let avatar: string | null = null;
-          if (rawPath && rawPath.length > 0) {
+          if (rawPath) {
             if (rawPath.startsWith('http')) {
               avatar = rawPath;
             } else {
-              // это путь в Firebase Storage
               try {
                 avatar = await storage().ref(rawPath).getDownloadURL();
               } catch (err) {
@@ -103,21 +90,17 @@ export default function WelcomeScreen() {
         }
       }
 
-      // положим в глобальный кэш
       if (Object.keys(results).length) addPlayers(results);
-
       return results;
     },
     [addPlayers]
   );
 
-  /**
-   * Разбор снапшота матчей, подгрузка недостающих профилей и формирование playerProfiles
-   */
+  // парсим снапшот матчей
   const parseSnapshot = useCallback(
-    async (snapshot: any) => {
-      const matchesList: Match[] = snapshot.docs.map((docSnap: any) => {
-        const d = docSnap.data() as Record<string, any>;
+    async (snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>) => {
+      const matchesList: Match[] = snapshot.docs.map((docSnap) => {
+        const d = docSnap.data() as any;
         const playersArr = Array.isArray(d.players) ? d.players : [];
         const maxPlayers = Number.isFinite(Number(d.maxPlayers))
           ? Number(d.maxPlayers)
@@ -146,9 +129,9 @@ export default function WelcomeScreen() {
         };
       });
 
-      // Собираем юзеров, которых нет в кэше
+      // подтягиваем профили игроков
       const allIds = new Set<string>();
-      matchesList.forEach((m) => m.players?.forEach((uid) => allIds.add(uid)));
+      matchesList.forEach((m) => m.players?.forEach((uid: string) => allIds.add(uid)));
       const missing = Array.from(allIds).filter((id) => !cachedPlayers[id]);
 
       let newlyFetched: Record<string, PlayerProfile> = {};
@@ -167,7 +150,7 @@ export default function WelcomeScreen() {
 
       const updated = matchesList.map((m) => ({
         ...m,
-        playerProfiles: m.players?.map((uid) => profilesMap[uid]).filter(Boolean) || [],
+        playerProfiles: m.players?.map((uid: string) => profilesMap[uid]).filter(Boolean) || [],
       }));
 
       setMatches(updated);
@@ -179,8 +162,7 @@ export default function WelcomeScreen() {
     const spinner = useSpinnerStore.getState();
     spinner.show('Loading matches...');
     try {
-      const qMatches = query(collection(db, 'matches'));
-      const snapshot = await getDocs(qMatches);
+      const snapshot = await firestore().collection('matches').get();
       await parseSnapshot(snapshot);
     } catch (e) {
       console.error('Failed to load matches:', e);
@@ -192,21 +174,21 @@ export default function WelcomeScreen() {
   useEffect(() => {
     const spinner = useSpinnerStore.getState();
     spinner.show('Loading matches...');
-    const qMatches = query(collection(db, 'matches'));
 
-    const unsub = onSnapshot(
-      qMatches,
-      async (snapshot) => {
-        if (snapshotInitialized.current) return;
-        snapshotInitialized.current = true;
-        await parseSnapshot(snapshot);
-        spinner.hide();
-      },
-      (e) => {
-        console.error('Failed to fetch matches:', e);
-        spinner.hide();
-      }
-    );
+    const unsub = firestore()
+      .collection('matches')
+      .onSnapshot(
+        async (snapshot) => {
+          if (snapshotInitialized.current) return;
+          snapshotInitialized.current = true;
+          await parseSnapshot(snapshot);
+          spinner.hide();
+        },
+        (e) => {
+          console.error('Failed to fetch matches:', e);
+          spinner.hide();
+        }
+      );
 
     return () => {
       spinner.hide();
@@ -264,7 +246,11 @@ export default function WelcomeScreen() {
       />
 
       {modalVisible && (
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.modalOverlay}>
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(200)}
+          style={styles.modalOverlay}
+        >
           <TouchableOpacity style={styles.modalOverlay} onPress={() => setModalVisible(false)} />
           <Animated.View
             entering={SlideInUp.springify().damping(18)}
@@ -275,8 +261,14 @@ export default function WelcomeScreen() {
               <AddMatchModal
                 visible={modalVisible}
                 onClose={() => setModalVisible(false)}
-                onSubmit={({ location, price }) => {
-                  Alert.alert('Submit', `Location: ${location}, Price: ${price}`);
+                onSubmit={async (data) => {
+                  try {
+                    const id = await createMatch(data);
+                    Alert.alert('Match created', `ID: ${id}`);
+                    await loadMatches();
+                  } catch (e: any) {
+                    Alert.alert('Save error', e?.message ?? String(e));
+                  }
                 }}
               />
             </Animated.View>
