@@ -1,5 +1,5 @@
 // path: src/screens/Welcome/components/AddMatchModal.tsx
-// Полный компонент модалки (обновлён под сохранение, без телефона, режим Singles/Doubles)
+// Полный компонент модалки (сохранение готовых данных; режим Singles/Doubles; SafeArea в поиске клуба)
 
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
@@ -61,8 +61,8 @@ type Props = {
 export default function AddMatchModal({ visible, onClose, onSubmit }: Props) {
   // базовые поля
   const [clubId, setClubId] = useState<string>(CLUBS[0].id);
-  const [price, setPrice] = useState<string>('');
-  const [mode, setMode] = useState<'Singles' | 'Doubles'>('Doubles'); // режим
+  const [price, setPrice] = useState<string>(''); // может быть пустым
+  const [mode, setMode] = useState<'Singles' | 'Doubles'>('Doubles');
   const [maxPlayers, setMaxPlayers] = useState<number>(4);
   const [imageUrl, setImageUrl] = useState<string>('');
   const [duration, setDuration] = useState<number>(60);
@@ -101,9 +101,16 @@ export default function AddMatchModal({ visible, onClose, onSubmit }: Props) {
     return d;
   }, [dateOptions, dateIndex, hour, minute]);
 
-  // валидация цены
-  const parsedPrice = Number.parseFloat(price);
-  const isValid = !Number.isNaN(parsedPrice) && parsedPrice >= 0;
+  // ✅ Парсим цену: пустая строка = 0, поддержка запятой
+  const priceNumber = useMemo(() => {
+    if (price.trim() === '') return 0;
+    const norm = price.replace(',', '.').replace(/[^\d.]/g, '');
+    const n = Number.parseFloat(norm);
+    return Number.isFinite(n) ? n : 0;
+  }, [price]);
+
+  // ✅ Делаем кнопку активной (все поля имеют дефолты)
+  const isValid = true;
 
   // выбор режима игры
   const onPickMode = (m: 'Singles' | 'Doubles') => {
@@ -113,20 +120,18 @@ export default function AddMatchModal({ visible, onClose, onSubmit }: Props) {
 
   // отправка наверх
   const handleSubmit = () => {
-    if (!isValid) return;
     const club = selectedClub;
     onSubmit({
       location: club.name,
       sport: club.sport as CreateMatchInput['sport'],
-      price: parsedPrice,
+      price: priceNumber,            // всегда число
       time: computedDate,
       duration,
       booked,
-      // соответствие твоей схеме:
       imageUrl: imageUrl?.trim() || null,
       maxPlayers,
       singles: mode === 'Singles',
-      // опциональные поля, которых нет в UI: заполним null/по умолчанию
+      // поля, которых нет в UI
       address: null,
       level: null,
       phone: null,
@@ -256,7 +261,7 @@ export default function AddMatchModal({ visible, onClose, onSubmit }: Props) {
                 placeholder="0"
                 value={price}
                 onChangeText={setPrice}
-                keyboardType="numeric"
+                keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'} // удобнее вводить , и .
                 style={styles.input}
               />
 
@@ -292,7 +297,7 @@ export default function AddMatchModal({ visible, onClose, onSubmit }: Props) {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSubmit}
-                disabled={!isValid}
+                disabled={!isValid} // сейчас всегда true
                 style={[styles.btn, styles.btnPrimary, !isValid && styles.btnDisabled]}
               >
                 <Text style={styles.btnText}>Save</Text>

@@ -1,6 +1,9 @@
 // path: src/screens/Welcome/WelcomeScreen.tsx
+// Экран списка: тянем все профили игроков (http / gs:// / путь),
+// заполняем playerProfiles у матча, скрываем заполнённые матчи (2/4 слота).
+
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore'; // ✅ так правильно
+import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import storage from '@react-native-firebase/storage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -10,7 +13,7 @@ import {
   Platform,
   RefreshControl,
   Text,
-  TouchableOpacity
+  TouchableOpacity,
 } from 'react-native';
 import Animated, {
   BounceIn,
@@ -31,10 +34,9 @@ import { styles } from './WelcomeScreen.styles';
 import AddMatchModal from './components/AddMatchModal';
 import MatchCard from './components/MatchCard';
 
+// нормализация спорта
 const getSafeSport = (sport: string): Match['sport'] =>
-  ['Tennis', 'Padel', 'Pickleball'].includes(sport)
-    ? (sport as Match['sport'])
-    : 'Padel';
+  ['Tennis', 'Padel', 'Pickleball'].includes(sport as any) ? (sport as Match['sport']) : 'Padel';
 
 export default function WelcomeScreen() {
   const [matches, setMatches] = useState<Match[]>([]);
@@ -44,12 +46,13 @@ export default function WelcomeScreen() {
   const { players: cachedPlayers, addPlayers } = usePlayerStore();
   const snapshotInitialized = useRef(false);
 
-  // подгружаем недостающие профили игроков
+  // подгружаем недостающие профили игроков (батчами по 10 id)
   const fetchMissingPlayers = useCallback(
     async (ids: string[]): Promise<Record<string, PlayerProfile>> => {
       if (ids.length === 0) return {};
-
       const usersRef = firestore().collection('users');
+
+      // делим на чанки по 10 для where in
       const chunks: string[][] = [];
       for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
 
@@ -64,20 +67,32 @@ export default function WelcomeScreen() {
       for (const snap of snaps) {
         for (const docSnap of snap.docs) {
           const data = docSnap.data() as any;
+
+          // возможные поля для аватара
           const rawPath: string | null =
             (typeof data?.avatar === 'string' && data.avatar) ||
             (typeof data?.avatarUrl === 'string' && data.avatarUrl) ||
             null;
 
           let avatar: string | null = null;
+
           if (rawPath) {
             if (rawPath.startsWith('http')) {
+              // уже https
               avatar = rawPath;
+            } else if (rawPath.startsWith('gs://')) {
+              // gs:// → обязательно refFromURL
+              try {
+                avatar = await storage().refFromURL(rawPath).getDownloadURL();
+              } catch (err) {
+                console.warn('⚠️ Failed to load avatar (gs://)', docSnap.id, rawPath, err);
+              }
             } else {
+              // путь в бакете
               try {
                 avatar = await storage().ref(rawPath).getDownloadURL();
               } catch (err) {
-                console.warn('⚠️ Failed to load avatar from storage', docSnap.id, rawPath, err);
+                console.warn('⚠️ Failed to load avatar (path)', docSnap.id, rawPath, err);
               }
             }
           }
@@ -85,12 +100,12 @@ export default function WelcomeScreen() {
           results[docSnap.id] = {
             id: docSnap.id,
             name: data?.name ?? data?.fullName ?? null,
-            avatar,
+            avatar, // уже нормализованный https или null
           };
         }
       }
 
-      if (Object.keys(results).length) addPlayers(results);
+      if (Object.keys(results).length) addPlayers(results); // кешируем в zustand
       return results;
     },
     [addPlayers]
@@ -98,38 +113,40 @@ export default function WelcomeScreen() {
 
   // парсим снапшот матчей
   const parseSnapshot = useCallback(
-    async (snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>) => {
-      const matchesList: Match[] = snapshot.docs.map((docSnap) => {
-        const d = docSnap.data() as any;
-        const playersArr = Array.isArray(d.players) ? d.players : [];
-        const maxPlayers = Number.isFinite(Number(d.maxPlayers))
-          ? Number(d.maxPlayers)
-          : d.singles
-          ? 2
-          : 4;
+    async (
+      snapshot: FirebaseFirestoreTypes.QuerySnapshot<FirebaseFirestoreTypes.DocumentData>
+    ) => {
+      const matchesList: (Match & { playerProfiles?: PlayerProfile[] })[] = snapshot.docs.map(
+        (docSnap) => {
+          const d = docSnap.data() as any;
+          const playersArr: string[] = Array.isArray(d.players) ? d.players : [];
 
-        return {
-          id: docSnap.id,
-          location: String(d.location ?? d.address ?? '—'),
-          level: Number.isFinite(Number(d.level)) ? Number(d.level) : 0,
-          sport: getSafeSport(d.sport),
-          price: Number.isFinite(Number(d.price)) ? Number(d.price) : 0,
-          time: d.time ?? null,
-          phone: d.phone ? String(d.phone) : undefined,
-          players: playersArr,
-          maxPlayers,
-          playersCount: Number.isFinite(Number(d.playersCount))
-            ? Number(d.playersCount)
-            : playersArr.length,
-          imageUrl:
-            typeof d.imageUrl === 'string' && d.imageUrl.length > 0
-              ? d.imageUrl
-              : null,
-          singles: !!d.singles,
-        };
-      });
+          const maxPlayers = Number.isFinite(Number(d.maxPlayers))
+            ? Number(d.maxPlayers)
+            : d.singles
+            ? 2
+            : 4;
 
-      // подтягиваем профили игроков
+          return {
+            id: docSnap.id,
+            location: String(d.location ?? d.address ?? '—'),
+            level: Number.isFinite(Number(d.level)) ? Number(d.level) : 0,
+            sport: getSafeSport(String(d.sport ?? 'Padel')),
+            price: Number.isFinite(Number(d.price)) ? Number(d.price) : 0,
+            time: d.time ?? null,
+            phone: d.phone ? String(d.phone) : undefined,
+            players: playersArr,
+            maxPlayers,
+            playersCount: Number.isFinite(Number(d.playersCount))
+              ? Number(d.playersCount)
+              : playersArr.length,
+            imageUrl: typeof d.imageUrl === 'string' && d.imageUrl.length > 0 ? d.imageUrl : null,
+            singles: !!d.singles,
+          } as Match;
+        }
+      );
+
+      // собираем все id игроков для догрузки
       const allIds = new Set<string>();
       matchesList.forEach((m) => m.players?.forEach((uid: string) => allIds.add(uid)));
       const missing = Array.from(allIds).filter((id) => !cachedPlayers[id]);
@@ -143,34 +160,20 @@ export default function WelcomeScreen() {
         }
       }
 
-      const profilesMap: Record<string, PlayerProfile> = {
-        ...cachedPlayers,
-        ...newlyFetched,
-      };
+      const profilesMap: Record<string, PlayerProfile> = { ...cachedPlayers, ...newlyFetched };
 
+      // приклеиваем playerProfiles в порядке item.players
       const updated = matchesList.map((m) => ({
         ...m,
         playerProfiles: m.players?.map((uid: string) => profilesMap[uid]).filter(Boolean) || [],
       }));
 
-      setMatches(updated);
+      setMatches(updated as any);
     },
     [cachedPlayers, fetchMissingPlayers]
   );
 
-  const loadMatches = useCallback(async () => {
-    const spinner = useSpinnerStore.getState();
-    spinner.show('Loading matches...');
-    try {
-      const snapshot = await firestore().collection('matches').get();
-      await parseSnapshot(snapshot);
-    } catch (e) {
-      console.error('Failed to load matches:', e);
-    } finally {
-      spinner.hide();
-    }
-  }, [parseSnapshot]);
-
+  // разовая подписка на список матчей
   useEffect(() => {
     const spinner = useSpinnerStore.getState();
     spinner.show('Loading matches...');
@@ -196,12 +199,26 @@ export default function WelcomeScreen() {
     };
   }, [parseSnapshot]);
 
+  const loadMatches = useCallback(async () => {
+    const spinner = useSpinnerStore.getState();
+    spinner.show('Loading matches...');
+    try {
+      const snapshot = await firestore().collection('matches').get();
+      await parseSnapshot(snapshot);
+    } catch (e) {
+      console.error('Failed to load matches:', e);
+    } finally {
+      spinner.hide();
+    }
+  }, [parseSnapshot]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadMatches();
     setRefreshing(false);
   };
 
+  // навигация Waze
   const openWaze = async (loc: string) => {
     if (!loc) return;
     const ios = `waze://?q=${encodeURIComponent(loc)}&navigate=yes`;
@@ -211,6 +228,7 @@ export default function WelcomeScreen() {
     Linking.openURL(ok ? url : android);
   };
 
+  // WhatsApp
   const openWhatsApp = async (phone?: string) => {
     if (!phone) return;
     const clean = phone.replace(/[^\d+]/g, '');
@@ -220,25 +238,29 @@ export default function WelcomeScreen() {
     Linking.openURL(ok ? app : web);
   };
 
+  // Звонок
   const callPhone = (phone?: string) => {
     if (!phone) return;
     Linking.openURL(`tel:${phone}`);
   };
 
+  // фильтруем заполнённые матчи (исчезают из списка)
+  const visibleMatches = matches.filter((m: any) => {
+    const cap = m.maxPlayers ?? (m.singles ? 2 : 4);
+    const cnt = m.playersCount ?? m.players?.length ?? 0;
+    return cnt < cap;
+  });
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Text style={styles.heading}>Matches Near You</Text>
+
       <FlatList
-        data={matches}
+        data={visibleMatches}
         keyExtractor={(item) => item.id}
         initialNumToRender={5}
         renderItem={({ item }) => (
-          <MatchCard
-            item={item}
-            onWaze={openWaze}
-            onWhatsApp={openWhatsApp}
-            onCall={callPhone}
-          />
+          <MatchCard item={item} onWaze={openWaze} onWhatsApp={openWhatsApp} onCall={callPhone} />
         )}
         contentContainerStyle={[styles.list, { paddingBottom: 120 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
